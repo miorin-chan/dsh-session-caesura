@@ -8,7 +8,8 @@ After a turn finishes, enter a draft and click the quarter rest `𝄽` next to S
 latest note for that conversation in this browser and shows it at the end of the corresponding turn.
 Use **Copy** or **Send** below the note. Send submits a copy through the normal composer when it is available and empty.
 
-The note accepts the draft's text only. Drafts with attachments, reference chips or a leading slash stay in the
-normal composer. Plain Enter and the built-in Send button keep their regular behavior.
+Selected conversation quotes are saved as Markdown blockquotes. Drafts with attachments, `@` reference
+chips or a leading slash stay in the normal composer. Sending a note during generation queues it.
+Plain Enter and the built-in Send button keep their regular behavior.
 
 Install this directory in **Plugins** > **Add plugin**. See the [project documentation](docs/README.md) for checks.
