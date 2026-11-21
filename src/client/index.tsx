@@ -7,7 +7,8 @@ import type { ChatSnapshot } from '@deepseek-ai/dsh-client-ui-chat/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
-import { canSaveDraft, canSendNote, createNoteStore, readNote, saveDraftAsNote, submitNote } from '../lib/notes.js'
+import { canSaveDraft, canSendNote, createNoteStore, readNote, restoreNote, saveDraftAsNote, submitNote } from '../lib/notes.js'
+import { Icon, IconButton, styles, useNoteCopy } from './appearance.js'
 import { labels } from './labels.js'
 
 const namespace = 'dsh-closing-note'
@@ -25,20 +26,12 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 type ComposerProps = PropsRuntime<typeof inputSlot> & PropsLocale<typeof namespace>
 type TailProps = PropsRuntime<typeof tailSlot> & PropsLocale<typeof namespace>
 
-const toolbarStyle = {
-  width: 30, height: 30, padding: 0, display: 'inline-grid', placeItems: 'center',
-  border: 0, borderRadius: 'var(--dsw-radius-sm)', background: 'transparent',
-  color: 'var(--dsw-alias-label-secondary)', fontSize: 19, lineHeight: 1,
-} as const
-
-const actionStyle = {
-  border: 0, borderRadius: 'var(--dsw-radius-sm)', padding: '4px 8px',
-  background: 'transparent', color: 'var(--dsw-alias-label-secondary)', font: 'inherit',
-} as const
-
 export function apply(ctx: Context): void {
   ctx.effect(() => ctx.locale.register(namespace, labels), `${namespace}: locale`)
   ctx.effect(() => {
+    const stylesheet = document.createElement('style')
+    stylesheet.textContent = styles
+    document.head.append(stylesheet)
     const notes = createNoteStore(() => window.localStorage, window)
     const unregisterInput = ctx.slots.inject(inputSlot, () => ctx.slots.register({
       name: inputSlot, id: namespace, locale: namespace,
@@ -50,6 +43,7 @@ export function apply(ctx: Context): void {
       unregisterTail()
       unregisterInput()
       notes.dispose()
+      stylesheet.remove()
     }
 
     function SaveButton({ inputActions, sessionId, t, useAccess, useChat, useInput, useSession }: ComposerProps) {
@@ -67,19 +61,11 @@ export function apply(ctx: Context): void {
       const canSave = canSaveDraft(input)
       return (
         <span style={{ display: 'inline-flex', alignItems: 'center' }}>
-          <button
-            type="button"
-            data-dsh-closing-note-save
-            aria-label={t('save')}
-            title={t(canSave ? 'save' : 'plainDraft')}
-            disabled={!canSave}
-            style={{ ...toolbarStyle, opacity: canSave ? 1 : 0.48, cursor: canSave ? 'pointer' : 'default' }}
-            onMouseDown={event => event.preventDefault()}
-            onClick={() => {
+          <IconButton label={t('save')} hint={canSave ? undefined : t('plainDraft')}
+            unavailable={!canSave} save onClick={() => {
               const result = saveDraftAsNote(input, endSeq, note => notes.write(sessionId, note), inputActions)
               setFailedSession(result === 'storage-error' ? sessionId : null)
-            }}
-          ><span aria-hidden="true">𝄽</span></button>
+            }}><Icon name="rest" size={24} /></IconButton>
           {failedSession === sessionId && (
             <span role="alert" style={{ color: 'var(--dsw-alias-label-primary)', fontSize: 12 }}>{t('saveFailed')}</span>
           )}
@@ -93,56 +79,53 @@ export function apply(ctx: Context): void {
       const note = readNote(useSyncExternalStore(subscribe, getSnapshot))
       if (note === null || turn.end?.seq !== note.endSeq) return null
       return <SendableNote key={note.text} note={note} t={t} useInput={useInput}
-        inputActions={inputActions} useAccess={useAccess} useSession={useSession} />
+        inputActions={inputActions} useAccess={useAccess} useSession={useSession}
+        remove={() => notes.remove(sessionId, note)} />
     }
 
-    function SendableNote({ note, t, useInput, inputActions, useAccess, useSession }:
+    function SendableNote({ note, t, useInput, inputActions, useAccess, useSession, remove }:
       Pick<TailProps, 't' | 'useInput' | 'inputActions' | 'useAccess' | 'useSession'>
-      & { note: NonNullable<ReturnType<typeof readNote>> }) {
+      & { note: NonNullable<ReturnType<typeof readNote>>; remove: () => void }) {
       const input = useInput((state: InputState) => state)
       const allowed = useAccess('session/prompt')
       const ready = useSession((state: SessionSnapshot) => state.openState === 'open' && !state.removed
         && state.pendingSubmissions.length === 0)
       const canSend = allowed && ready && canSendNote(input)
       return <NoteCard note={note} t={t} canSend={canSend}
+        onRewind={() => { if (canSend && restoreNote(input, note, inputActions)) remove() }}
         onSend={() => { if (canSend) submitNote(input, note, inputActions) }} />
     }
   }, `${namespace}: composer and turn tail`)
 }
 
-function NoteCard({ note, t, canSend, onSend }: {
+function NoteCard({ note, t, canSend, onRewind, onSend }: {
   note: NonNullable<ReturnType<typeof readNote>>
   t: TailProps['t']
   canSend: boolean
+  onRewind: () => void
   onSend: () => void
 }) {
-  const [copyStatus, setCopyStatus] = useState<'ready' | 'copied' | 'copyFailed'>('ready')
+  const { status, copy } = useNoteCopy(note.text)
+  const [rewindFailed, setRewindFailed] = useState(false)
+  const hint = canSend ? undefined : t('emptyDraft')
   return (
-    <section data-dsh-closing-note aria-label={t('title')} style={{
-      borderInlineStart: '2px solid var(--dsw-alias-border-l2)', padding: '4px 12px',
-      marginBlock: '8px', color: 'var(--dsw-alias-label-primary)',
-    }}>
-      <div style={{ color: 'var(--dsw-alias-label-secondary)', fontSize: 12 }}>
-        <span aria-hidden="true">𝄽 </span>{t('title')}
+    <section className="dsh-cn-note" data-dsh-closing-note aria-label={t('title')}>
+      <div className="dsh-cn-title"><Icon name="rest" size={15} />{t('title')}</div>
+      <div className="dsh-cn-bubble">{note.text}</div>
+      <div className="dsh-cn-actions">
+        <IconButton label={t(status === 'copied' ? 'copied' : 'copy')} onClick={() => { void copy() }}>
+          <Icon name={status === 'copied' ? 'check' : 'copy'} />
+        </IconButton>
+        <IconButton label={t('rewind')} hint={hint} unavailable={!canSend} onClick={() => {
+          try { onRewind() } catch { setRewindFailed(true) }
+        }}><Icon name="rewind" /></IconButton>
+        <IconButton label={t('send')} hint={hint} unavailable={!canSend} onClick={onSend}>
+          <Icon name="send" />
+        </IconButton>
       </div>
-      <div style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', paddingBlock: '4px' }}>{note.text}</div>
-      <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 4, fontSize: 12 }}>
-        <button type="button" style={{ ...actionStyle, cursor: 'pointer' }} onClick={async () => {
-          try {
-            await navigator.clipboard.writeText(note.text)
-            setCopyStatus('copied')
-          } catch {
-            setCopyStatus('copyFailed')
-          }
-        }}>{t('copy')}</button>
-        <span title={canSend ? undefined : t('emptyDraft')}>
-          <button type="button" disabled={!canSend} onClick={onSend}
-            style={{ ...actionStyle, opacity: canSend ? 1 : 0.5, cursor: canSend ? 'pointer' : 'default' }}>
-            {t('send')}
-          </button>
-        </span>
-        <span role="status">{copyStatus === 'ready' ? '' : t(copyStatus)}</span>
-      </div>
+      <span className={status === 'copyFailed' || rewindFailed ? 'dsh-cn-status' : 'dsh-cn-sr'} role="status">
+        {rewindFailed ? t('rewindFailed') : status === 'ready' ? '' : t(status)}
+      </span>
     </section>
   )
 }

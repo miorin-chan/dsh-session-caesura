@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { createRequire } from 'node:module'
 import { test } from 'node:test'
-import { createNoteStore, readNote, saveDraftAsNote, submitNote } from '../lib/notes.js'
+import { createNoteStore, readNote, restoreNote, saveDraftAsNote, submitNote } from '../lib/notes.js'
 
 const require = createRequire(import.meta.url)
 const NS = 'dsh-closing-note'
@@ -14,12 +14,18 @@ function fakeStorage() {
   return {
     getItem: key => data.get(key) ?? null,
     setItem: (key, value) => data.set(key, value),
+    removeItem: key => data.delete(key),
   }
 }
 
 test('registers both localized slots and disposes its resources', async () => {
   let registration
   globalThis.window = Object.assign(new EventTarget(), { __ModuleLoader__: { load: entry => { registration = entry } } })
+  const mountedStyles = new Set()
+  globalThis.document = {
+    createElement: () => ({ remove() { mountedStyles.delete(this) } }),
+    head: { append: style => mountedStyles.add(style) },
+  }
   try {
     await import('../client.js')
     assert.equal(registration.id, NS)
@@ -47,11 +53,14 @@ test('registers both localized slots and disposes its resources', async () => {
     assert.deepEqual([...entries.keys()], ['conversation.input.right', 'conversation.chat.turnTail'])
     assert.equal(entries.get('conversation.chat.turnTail').options.locale, NS)
     assert.equal(Object.keys(dictionaries.get(NS)).length, 8)
+    assert.equal(mountedStyles.size, 1)
     effects.reverse().forEach(dispose => dispose())
     assert.equal(entries.size, 0)
     assert.equal(dictionaries.size, 0)
+    assert.equal(mountedStyles.size, 0)
   } finally {
     delete globalThis.window
+    delete globalThis.document
   }
 })
 
@@ -115,4 +124,25 @@ test('keeps only the latest note per session and refreshes subscribed readers', 
   for (const invalid of ['{', 'null', '{"endSeq":2,"text":"/command"}', '{"endSeq":-1,"text":"note"}']) {
     assert.equal(readNote(invalid), null)
   }
+})
+
+test('rewind restores the note without sending and only removes the matching saved version', () => {
+  const storage = fakeStorage()
+  const store = createNoteStore(() => storage, new EventTarget())
+  let current = draft.draft
+  const actions = {
+    setDraft: text => { current = text },
+    persistDraft: () => assert.equal(current, note.text),
+    submit: () => assert.fail('rewind must not send'),
+  }
+  store.write('a', note)
+  assert.equal(restoreNote(draft, note, actions), false)
+  assert.deepEqual(readNote(store.read('a')), note)
+  assert.equal(restoreNote(empty, note, actions), true)
+  store.write('a', { ...note, text: 'New note' })
+  store.remove('a', note)
+  assert.equal(readNote(store.read('a')).text, 'New note')
+  store.remove('a', { ...note, text: 'New note' })
+  assert.equal(readNote(store.read('a')), null)
+  store.dispose()
 })

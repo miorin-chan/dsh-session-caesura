@@ -1,6 +1,6 @@
 {
   "name": "dsh-closing-note",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "license": "MIT",
   "description": "Save a private note at the end of an idle conversation.",

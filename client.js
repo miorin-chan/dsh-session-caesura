@@ -34,7 +34,7 @@ __export(index_exports, {
   inject: () => inject
 });
 module.exports = __toCommonJS(index_exports);
-var import_react = require("react");
+var import_react2 = require("react");
 
 // src/lib/notes.ts
 function isNoteText(text) {
@@ -68,10 +68,14 @@ function saveDraftAsNote(input, endSeq, write, actions) {
   actions.persistDraft();
   return "saved";
 }
-function submitNote(input, note, actions) {
+function restoreNote(input, note, actions) {
   if (!canSendNote(input) || !isNoteText(note.text)) return false;
   actions.setDraft(note.text);
   actions.persistDraft();
+  return true;
+}
+function submitNote(input, note, actions) {
+  if (!restoreNote(input, note, actions)) return false;
   actions.submit();
   return true;
 }
@@ -99,6 +103,14 @@ function createNoteStore(getStorage, events) {
       getStorage().setItem(key, JSON.stringify(note));
       publish(key);
     },
+    remove(sessionId, note) {
+      const storage = getStorage();
+      const key = prefix + sessionId;
+      const current = readNote(storage.getItem(key));
+      if (current?.endSeq !== note.endSeq || current.text !== note.text) return;
+      storage.removeItem(key);
+      publish(key);
+    },
     subscribe(sessionId, listener) {
       const key = prefix + sessionId;
       const current = listeners.get(key) ?? /* @__PURE__ */ new Set();
@@ -116,6 +128,129 @@ function createNoteStore(getStorage, events) {
   };
 }
 
+// src/client/appearance.tsx
+var import_react = require("react");
+var import_jsx_runtime = require("react/jsx-runtime");
+var styles = `
+.dsh-cn-note { display: flex; flex-direction: column; align-items: flex-end; margin-block: 8px; }
+.dsh-cn-bubble {
+  box-sizing: border-box;
+  max-width: min(calc(var(--dsh-chat-content-width, 748px) * 0.702), 82%);
+  background: var(--dsw-specific-bubble); border-radius: var(--dsw-radius-xl);
+  padding: 10px 16px; color: var(--dsw-alias-label-primary);
+  font-size: var(--dsh-content-font-size, 14px);
+  line-height: calc(22px + var(--dsh-content-font-delta, 0px));
+  white-space: pre-wrap; overflow-wrap: anywhere;
+}
+.dsh-cn-title {
+  display: flex; align-items: center; gap: 4px; margin-bottom: 3px;
+  color: var(--dsw-alias-label-secondary); font-size: var(--dsh-content-font-size-secondary, 13px);
+}
+.dsh-cn-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 2px; }
+.dsh-cn-button {
+  box-sizing: border-box; display: inline-grid; place-items: center; flex: none;
+  width: calc(28px + var(--dsh-content-font-delta, 0px)); height: calc(28px + var(--dsh-content-font-delta, 0px));
+  padding: 0; border: 0; border-radius: var(--dsw-radius-sm); background: transparent;
+  color: var(--dsw-alias-label-tertiary, var(--dsw-alias-label-secondary)); cursor: pointer;
+}
+.dsh-cn-button.dsh-cn-save { width: 34px; height: 34px; color: var(--dsw-alias-label-secondary); }
+.dsh-cn-button[aria-disabled='true'] { opacity: 0.45; cursor: default; }
+.dsh-cn-button:focus-visible {
+  outline: var(--dsw-focus-ring-width, 2px) solid var(--dsw-focus-ring-color, var(--dsw-alias-brand-primary));
+  outline-offset: -2px;
+}
+@media (hover: hover) {
+  .dsh-cn-button:not([aria-disabled='true']):hover {
+    color: var(--dsw-alias-label-primary); background: var(--dsw-alias-interactive-bg-hover);
+  }
+}
+.dsh-cn-status { color: var(--dsw-alias-state-error-primary); font-size: 12px; }
+.dsh-cn-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+`;
+var artwork = {
+  rest: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "m9.1 2.4 6.2 7-4 3.6 4 4.3c-3.8-1.1-6.1 1.1-4.1 4.3" }),
+  copy: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
+    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("rect", { x: "8", y: "8", width: "12", height: "12", rx: "2" }),
+    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" })
+  ] }),
+  check: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "m5 12 4 4L19 6" }),
+  rewind: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
+    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "M4 10h11a5 5 0 0 1 0 10h-3" }),
+    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "m9 5-5 5 5 5" })
+  ] }),
+  send: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
+    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "m3 10 18-7-7 18-3.4-7.6L3 10Z" }),
+    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "m10.6 13.4 5-5" })
+  ] })
+};
+function Icon({ name, size = 17 }) {
+  return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+    "svg",
+    {
+      "aria-hidden": "true",
+      focusable: "false",
+      width: size,
+      height: size,
+      viewBox: "0 0 24 24",
+      fill: "none",
+      stroke: "currentColor",
+      strokeWidth: name === "rest" ? 2.5 : 1.65,
+      strokeLinecap: "round",
+      strokeLinejoin: "round",
+      children: artwork[name]
+    }
+  );
+}
+function IconButton({ label, hint, unavailable = false, save = false, onClick, children }) {
+  const description = hint ?? label;
+  return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+    "button",
+    {
+      type: "button",
+      className: `dsh-cn-button${save ? " dsh-cn-save" : ""}`,
+      "data-dsh-closing-note-save": save ? "" : void 0,
+      "aria-label": label,
+      "aria-disabled": unavailable || void 0,
+      "aria-description": hint,
+      title: description,
+      onMouseDown: save ? (event) => event.preventDefault() : void 0,
+      onClick: () => {
+        if (!unavailable) onClick();
+      },
+      children
+    }
+  );
+}
+function useNoteCopy(text) {
+  const [status, setStatus] = (0, import_react.useState)("ready");
+  const pending = (0, import_react.useRef)(false);
+  const timer = (0, import_react.useRef)(void 0);
+  const active = (0, import_react.useRef)(true);
+  (0, import_react.useEffect)(() => {
+    active.current = true;
+    return () => {
+      active.current = false;
+      clearTimeout(timer.current);
+    };
+  }, []);
+  return { status, async copy() {
+    if (pending.current) return;
+    pending.current = true;
+    clearTimeout(timer.current);
+    let result = "copied";
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      result = "copyFailed";
+    } finally {
+      pending.current = false;
+    }
+    if (!active.current) return;
+    setStatus(result);
+    timer.current = setTimeout(() => setStatus("ready"), result === "copied" ? 1200 : 3e3);
+  } };
+}
+
 // src/client/labels.ts
 var en = {
   title: "Closing note",
@@ -126,7 +261,9 @@ var en = {
   copyFailed: "Could not copy",
   copied: "Copied",
   send: "Send",
-  emptyDraft: "Sending requires an available, empty composer"
+  rewind: "Rewind to composer",
+  rewindFailed: "The note could not be fully moved back.",
+  emptyDraft: "This action needs an available, empty composer"
 };
 var labels = {
   en,
@@ -139,7 +276,9 @@ var labels = {
     copyFailed: "\u590D\u5236\u5931\u8D25",
     copied: "\u5DF2\u590D\u5236",
     send: "\u53D1\u9001",
-    emptyDraft: "\u8F93\u5165\u6846\u53EF\u7528\u4E14\u4E3A\u7A7A\u65F6\u53EF\u4EE5\u53D1\u9001\u7ED3\u8BED"
+    rewind: "\u56DE\u9000\u5230\u8F93\u5165\u6846",
+    rewindFailed: "\u672A\u80FD\u5B8C\u6574\u79FB\u56DE\u7ED3\u8BED",
+    emptyDraft: "\u8F93\u5165\u6846\u53EF\u7528\u4E14\u4E3A\u7A7A\u65F6\u53EF\u64CD\u4F5C"
   },
   ja: {
     title: "\u7DE0\u3081\u304F\u304F\u308A\u30E1\u30E2",
@@ -150,7 +289,9 @@ var labels = {
     copyFailed: "\u30B3\u30D4\u30FC\u3067\u304D\u307E\u305B\u3093\u3067\u3057\u305F",
     copied: "\u30B3\u30D4\u30FC\u3057\u307E\u3057\u305F",
     send: "\u9001\u4FE1",
-    emptyDraft: "\u5165\u529B\u6B04\u304C\u4F7F\u7528\u53EF\u80FD\u3067\u7A7A\u306E\u5834\u5408\u306B\u9001\u4FE1\u3067\u304D\u307E\u3059"
+    rewind: "\u5165\u529B\u6B04\u306B\u623B\u3059",
+    rewindFailed: "\u30E1\u30E2\u3092\u5B8C\u5168\u306B\u623B\u305B\u307E\u305B\u3093\u3067\u3057\u305F",
+    emptyDraft: "\u5165\u529B\u6B04\u304C\u4F7F\u7528\u53EF\u80FD\u3067\u7A7A\u306E\u5834\u5408\u306B\u64CD\u4F5C\u3067\u304D\u307E\u3059"
   },
   de: {
     title: "Abschlussnotiz",
@@ -161,7 +302,9 @@ var labels = {
     copyFailed: "Kopieren fehlgeschlagen",
     copied: "Kopiert",
     send: "Senden",
-    emptyDraft: "Zum Senden muss das Eingabefeld verf\xFCgbar und leer sein"
+    rewind: "Zur\xFCck ins Eingabefeld",
+    rewindFailed: "Die Notiz konnte nicht vollst\xE4ndig zur\xFCckgeholt werden.",
+    emptyDraft: "Das Eingabefeld muss verf\xFCgbar und leer sein"
   },
   es: {
     title: "Nota de cierre",
@@ -172,7 +315,9 @@ var labels = {
     copyFailed: "No se pudo copiar",
     copied: "Copiado",
     send: "Enviar",
-    emptyDraft: "Para enviar, el campo de texto debe estar disponible y vac\xEDo"
+    rewind: "Volver al campo de texto",
+    rewindFailed: "No se pudo mover por completo la nota.",
+    emptyDraft: "El campo de texto debe estar disponible y vac\xEDo"
   },
   fr: {
     title: "Note de fin",
@@ -183,7 +328,9 @@ var labels = {
     copyFailed: "\xC9chec de la copie",
     copied: "Copi\xE9",
     send: "Envoyer",
-    emptyDraft: "Le champ de saisie doit \xEAtre disponible et vide pour envoyer la note"
+    rewind: "Renvoyer dans le champ de saisie",
+    rewindFailed: "La note n\u2019a pas pu \xEAtre d\xE9plac\xE9e enti\xE8rement.",
+    emptyDraft: "Le champ de saisie doit \xEAtre disponible et vide"
   },
   pt: {
     title: "Nota de encerramento",
@@ -194,7 +341,9 @@ var labels = {
     copyFailed: "N\xE3o foi poss\xEDvel copiar",
     copied: "Copiado",
     send: "Enviar",
-    emptyDraft: "O campo de texto deve estar dispon\xEDvel e vazio para enviar a nota"
+    rewind: "Voltar ao campo de texto",
+    rewindFailed: "N\xE3o foi poss\xEDvel mover toda a nota.",
+    emptyDraft: "O campo de texto deve estar dispon\xEDvel e vazio"
   },
   ru: {
     title: "\u0417\u0430\u043A\u043B\u044E\u0447\u0438\u0442\u0435\u043B\u044C\u043D\u0430\u044F \u0437\u0430\u043C\u0435\u0442\u043A\u0430",
@@ -205,40 +354,24 @@ var labels = {
     copyFailed: "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0441\u043A\u043E\u043F\u0438\u0440\u043E\u0432\u0430\u0442\u044C",
     copied: "\u0421\u043A\u043E\u043F\u0438\u0440\u043E\u0432\u0430\u043D\u043E",
     send: "\u041E\u0442\u043F\u0440\u0430\u0432\u0438\u0442\u044C",
-    emptyDraft: "\u0414\u043B\u044F \u043E\u0442\u043F\u0440\u0430\u0432\u043A\u0438 \u043D\u0443\u0436\u043D\u043E \u0434\u043E\u0441\u0442\u0443\u043F\u043D\u043E\u0435 \u0438 \u043F\u0443\u0441\u0442\u043E\u0435 \u043F\u043E\u043B\u0435 \u0432\u0432\u043E\u0434\u0430"
+    rewind: "\u0412\u0435\u0440\u043D\u0443\u0442\u044C \u0432 \u043F\u043E\u043B\u0435 \u0432\u0432\u043E\u0434\u0430",
+    rewindFailed: "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043F\u043E\u043B\u043D\u043E\u0441\u0442\u044C\u044E \u043F\u0435\u0440\u0435\u043D\u0435\u0441\u0442\u0438 \u0437\u0430\u043C\u0435\u0442\u043A\u0443.",
+    emptyDraft: "\u041F\u043E\u043B\u0435 \u0432\u0432\u043E\u0434\u0430 \u0434\u043E\u043B\u0436\u043D\u043E \u0431\u044B\u0442\u044C \u0434\u043E\u0441\u0442\u0443\u043F\u043D\u043E \u0438 \u043F\u0443\u0441\u0442\u043E"
   }
 };
 
 // src/client/index.tsx
-var import_jsx_runtime = require("react/jsx-runtime");
+var import_jsx_runtime2 = require("react/jsx-runtime");
 var namespace = "dsh-closing-note";
 var inputSlot = "conversation.input.right";
 var tailSlot = "conversation.chat.turnTail";
 var inject = ["slots", "locale"];
-var toolbarStyle = {
-  width: 30,
-  height: 30,
-  padding: 0,
-  display: "inline-grid",
-  placeItems: "center",
-  border: 0,
-  borderRadius: "var(--dsw-radius-sm)",
-  background: "transparent",
-  color: "var(--dsw-alias-label-secondary)",
-  fontSize: 19,
-  lineHeight: 1
-};
-var actionStyle = {
-  border: 0,
-  borderRadius: "var(--dsw-radius-sm)",
-  padding: "4px 8px",
-  background: "transparent",
-  color: "var(--dsw-alias-label-secondary)",
-  font: "inherit"
-};
 function apply(ctx) {
   ctx.effect(() => ctx.locale.register(namespace, labels), `${namespace}: locale`);
   ctx.effect(() => {
+    const stylesheet = document.createElement("style");
+    stylesheet.textContent = styles;
+    document.head.append(stylesheet);
     const notes = createNoteStore(() => window.localStorage, window);
     const unregisterInput = ctx.slots.inject(inputSlot, () => ctx.slots.register({
       name: inputSlot,
@@ -255,6 +388,7 @@ function apply(ctx) {
       unregisterTail();
       unregisterInput();
       notes.dispose();
+      stylesheet.remove();
     };
     function SaveButton({ inputActions, sessionId, t, useAccess, useChat, useInput, useSession }) {
       const endSeq = useChat(({ timeline }) => {
@@ -264,36 +398,33 @@ function apply(ctx) {
       const idle = useSession((state) => state.openState === "open" && !state.running && !state.removed && state.pendingSubmissions.length === 0 && state.subagent === null);
       const allowed = useAccess("session/prompt");
       const input = useInput((state) => state);
-      const [failedSession, setFailedSession] = (0, import_react.useState)(null);
+      const [failedSession, setFailedSession] = (0, import_react2.useState)(null);
       if (endSeq === void 0 || !idle || !allowed || input.queue.length > 0) return null;
       const canSave = canSaveDraft(input);
-      return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { style: { display: "inline-flex", alignItems: "center" }, children: [
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-          "button",
+      return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("span", { style: { display: "inline-flex", alignItems: "center" }, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
+          IconButton,
           {
-            type: "button",
-            "data-dsh-closing-note-save": true,
-            "aria-label": t("save"),
-            title: t(canSave ? "save" : "plainDraft"),
-            disabled: !canSave,
-            style: { ...toolbarStyle, opacity: canSave ? 1 : 0.48, cursor: canSave ? "pointer" : "default" },
-            onMouseDown: (event) => event.preventDefault(),
+            label: t("save"),
+            hint: canSave ? void 0 : t("plainDraft"),
+            unavailable: !canSave,
+            save: true,
             onClick: () => {
               const result = saveDraftAsNote(input, endSeq, (note) => notes.write(sessionId, note), inputActions);
               setFailedSession(result === "storage-error" ? sessionId : null);
             },
-            children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { "aria-hidden": "true", children: "\u{1D13D}" })
+            children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Icon, { name: "rest", size: 24 })
           }
         ),
-        failedSession === sessionId && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { role: "alert", style: { color: "var(--dsw-alias-label-primary)", fontSize: 12 }, children: t("saveFailed") })
+        failedSession === sessionId && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { role: "alert", style: { color: "var(--dsw-alias-label-primary)", fontSize: 12 }, children: t("saveFailed") })
       ] });
     }
     function NoteAtTurnEnd({ turn, sessionId, t, useInput, inputActions, useAccess, useSession }) {
-      const subscribe = (0, import_react.useCallback)((listener) => notes.subscribe(sessionId, listener), [sessionId]);
-      const getSnapshot = (0, import_react.useCallback)(() => notes.read(sessionId), [sessionId]);
-      const note = readNote((0, import_react.useSyncExternalStore)(subscribe, getSnapshot));
+      const subscribe = (0, import_react2.useCallback)((listener) => notes.subscribe(sessionId, listener), [sessionId]);
+      const getSnapshot = (0, import_react2.useCallback)(() => notes.read(sessionId), [sessionId]);
+      const note = readNote((0, import_react2.useSyncExternalStore)(subscribe, getSnapshot));
       if (note === null || turn.end?.seq !== note.endSeq) return null;
-      return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+      return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
         SendableNote,
         {
           note,
@@ -301,22 +432,26 @@ function apply(ctx) {
           useInput,
           inputActions,
           useAccess,
-          useSession
+          useSession,
+          remove: () => notes.remove(sessionId, note)
         },
         note.text
       );
     }
-    function SendableNote({ note, t, useInput, inputActions, useAccess, useSession }) {
+    function SendableNote({ note, t, useInput, inputActions, useAccess, useSession, remove }) {
       const input = useInput((state) => state);
       const allowed = useAccess("session/prompt");
       const ready = useSession((state) => state.openState === "open" && !state.removed && state.pendingSubmissions.length === 0);
       const canSend = allowed && ready && canSendNote(input);
-      return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+      return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
         NoteCard,
         {
           note,
           t,
           canSend,
+          onRewind: () => {
+            if (canSend && restoreNote(input, note, inputActions)) remove();
+          },
           onSend: () => {
             if (canSend) submitNote(input, note, inputActions);
           }
@@ -325,40 +460,30 @@ function apply(ctx) {
     }
   }, `${namespace}: composer and turn tail`);
 }
-function NoteCard({ note, t, canSend, onSend }) {
-  const [copyStatus, setCopyStatus] = (0, import_react.useState)("ready");
-  return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { "data-dsh-closing-note": true, "aria-label": t("title"), style: {
-    borderInlineStart: "2px solid var(--dsw-alias-border-l2)",
-    padding: "4px 12px",
-    marginBlock: "8px",
-    color: "var(--dsw-alias-label-primary)"
-  }, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { style: { color: "var(--dsw-alias-label-secondary)", fontSize: 12 }, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { "aria-hidden": "true", children: "\u{1D13D} " }),
+function NoteCard({ note, t, canSend, onRewind, onSend }) {
+  const { status, copy } = useNoteCopy(note.text);
+  const [rewindFailed, setRewindFailed] = (0, import_react2.useState)(false);
+  const hint = canSend ? void 0 : t("emptyDraft");
+  return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("section", { className: "dsh-cn-note", "data-dsh-closing-note": true, "aria-label": t("title"), children: [
+    /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "dsh-cn-title", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Icon, { name: "rest", size: 15 }),
       t("title")
     ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { style: { whiteSpace: "pre-wrap", overflowWrap: "anywhere", paddingBlock: "4px" }, children: note.text }),
-    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { style: { display: "flex", alignItems: "center", flexWrap: "wrap", gap: 4, fontSize: 12 }, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", style: { ...actionStyle, cursor: "pointer" }, onClick: async () => {
+    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "dsh-cn-bubble", children: note.text }),
+    /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "dsh-cn-actions", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(IconButton, { label: t(status === "copied" ? "copied" : "copy"), onClick: () => {
+        void copy();
+      }, children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Icon, { name: status === "copied" ? "check" : "copy" }) }),
+      /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(IconButton, { label: t("rewind"), hint, unavailable: !canSend, onClick: () => {
         try {
-          await navigator.clipboard.writeText(note.text);
-          setCopyStatus("copied");
+          onRewind();
         } catch {
-          setCopyStatus("copyFailed");
+          setRewindFailed(true);
         }
-      }, children: t("copy") }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { title: canSend ? void 0 : t("emptyDraft"), children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-        "button",
-        {
-          type: "button",
-          disabled: !canSend,
-          onClick: onSend,
-          style: { ...actionStyle, opacity: canSend ? 1 : 0.5, cursor: canSend ? "pointer" : "default" },
-          children: t("send")
-        }
-      ) }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { role: "status", children: copyStatus === "ready" ? "" : t(copyStatus) })
-    ] })
+      }, children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Icon, { name: "rewind" }) }),
+      /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(IconButton, { label: t("send"), hint, unavailable: !canSend, onClick: onSend, children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Icon, { name: "send" }) })
+    ] }),
+    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: status === "copyFailed" || rewindFailed ? "dsh-cn-status" : "dsh-cn-sr", role: "status", children: rewindFailed ? t("rewindFailed") : status === "ready" ? "" : t(status) })
   ] });
 }
 

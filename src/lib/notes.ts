@@ -61,10 +61,15 @@ export function saveDraftAsNote(
   return 'saved'
 }
 
-export function submitNote(input: InputDraft, note: ClosingNote, actions: DraftActions): boolean {
+export function restoreNote(input: InputDraft, note: ClosingNote, actions: Pick<DraftActions, 'setDraft' | 'persistDraft'>): boolean {
   if (!canSendNote(input) || !isNoteText(note.text)) return false
   actions.setDraft(note.text)
   actions.persistDraft()
+  return true
+}
+
+export function submitNote(input: InputDraft, note: ClosingNote, actions: DraftActions): boolean {
+  if (!restoreNote(input, note, actions)) return false
   actions.submit()
   return true
 }
@@ -89,6 +94,14 @@ export function createNoteStore(getStorage: () => Storage, events: Window) {
     write(sessionId: string, note: ClosingNote): void {
       const key = prefix + sessionId
       getStorage().setItem(key, JSON.stringify(note))
+      publish(key)
+    },
+    remove(sessionId: string, note: ClosingNote): void {
+      const storage = getStorage()
+      const key = prefix + sessionId
+      const current = readNote(storage.getItem(key))
+      if (current?.endSeq !== note.endSeq || current.text !== note.text) return
+      storage.removeItem(key)
       publish(key)
     },
     subscribe(sessionId: string, listener: () => void): () => void {

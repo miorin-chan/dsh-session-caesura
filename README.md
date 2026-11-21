@@ -6,7 +6,8 @@ Save a private closing note at the end of an idle conversation in DeepSeek Harne
 
 After a turn finishes, enter a draft and click the quarter rest `𝄽` next to Send. The plugin saves the
 latest note for that conversation in this browser and shows it at the end of the corresponding turn.
-Use **Copy** or **Send** below the note. Send submits a copy through the normal composer when it is available and empty.
+The icons below the note are **Copy**, **Rewind**, and **Send**. A check mark briefly replaces the copy icon on success.
+When the composer is available and empty, Rewind moves the note back for editing and Send submits a copy.
 
 Selected conversation quotes are saved as Markdown blockquotes. Drafts with attachments, `@` reference
 chips or a leading slash stay in the normal composer. Sending a note during generation queues it.
