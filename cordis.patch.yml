@@ -1,0 +1,5 @@
+# Activates the bundle. The Host half is inert; the Client half ships through
+# package.json `dsh.client` and carries Closing note.
+- insert:
+    - id: dsh-closing-note
+      name: 'dsh-closing-note'
