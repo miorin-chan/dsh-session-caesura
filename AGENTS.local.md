@@ -32,7 +32,8 @@ Check whether new behavior belongs in its own bundle.
 
 - [src/client/index.tsx](src/client/index.tsx) owns the composer button and turn-tail card.
 - [src/lib/notes.ts](src/lib/notes.ts) owns browser storage and draft operations.
-- [src/host/index.ts](src/host/index.ts) is the inert Host entry. `npm run build` generates `index.js`, `client.js`, and `lib/notes.js`.
+- [src/host/index.ts](src/host/index.ts) is the inert Host entry.
+  `npm run build` generates `index.js`, `client.js`, and `lib/notes.js`.
 - Keep Plugin Manager metadata in `locale/*.json` and runtime translations in [labels.ts](src/client/labels.ts).
 - The client test uses a fake `ctx` to check registration, resources, and cleanup.
 - `docs/scripts/reflow` is the standalone documentation formatter and requires Python 3.11 or newer.
@@ -41,8 +42,14 @@ Check whether new behavior belongs in its own bundle.
 
 - Keep the bundle independently installable and toggleable.
   Keep runtime modules private to this bundle and put shared tools in the workspace `tools/` directory.
-- Use public APIs where available. Explain required internal dependencies in the browser module header.
-  If the expected structure is missing, leave DSH behavior intact and log a single `console.warn`.
+- Implement new behavior through supported DSH plugin APIs and extension points.
+  Keep DSH source and installed files intact.
+  Do not patch global behavior or override DSH internals.
+  When an extension point is missing, report the gap and stay within supported scope.
+- Use TypeScript for new implementation.
+  Reuse the DSH type declarations for the supported runtime version.
+  Retain types across interfaces, configuration, and events, validate and narrow unknown inputs,
+  and keep type dependencies in sync.
 - Keep the factory free of side effects.
   Register resources in `apply` with `ctx.effect` or `ctx.on` and return cleanup functions.
 - Replace the placeholder icon with original artwork and update the title and description
@@ -56,7 +63,7 @@ Update `CHANGELOG.md` when releasing.
 
 ## Verification
 
-- Run `node --test` and `node --check client.js && node --check index.js` from the project directory.
+- Run `npm run build` and `npm run check` from the project directory.
 - From the workspace root, run `node tools/new-dsh-plugin/cli.mjs --check plugins/<id>` to check the manifest,
   locale JSON, and the other scaffold files.
 - Use a disposable profile for installation tests.
