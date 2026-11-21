@@ -2,7 +2,9 @@
 
 [简体中文](README.zh.md)
 
-Save a private closing note at the end of an idle conversation in DeepSeek Harness 0.2.2-rc.5.
+Save a private closing note at the end of a conversation to record your progress or what you learned without continuing the conversation.
+
+Supports DeepSeek Harness 0.2.2-rc.5.
 
 After a turn finishes, enter a draft and click the quarter rest `𝄽` next to Send.
 The plugin saves the latest note for that conversation in this browser and shows it

@@ -3,7 +3,7 @@
   "version": "0.1.2",
   "private": true,
   "license": "MIT",
-  "description": "Save a private note at the end of an idle conversation.",
+  "description": "Save a private closing note at the end of a conversation to record your progress or what you learned without continuing the conversation.",
   "type": "module",
   "keywords": [
     "deepseek-harness",
