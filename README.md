@@ -8,7 +8,7 @@ without continuing the conversation.
 Supports DeepSeek Harness 0.2.2-rc.5.
 
 After a turn finishes, enter a draft and hold Mod (Command on macOS, Ctrl on Windows and Linux).
-Click the quarter rest `𝄽` that appears next to Send.
+Click the quarter rest `𝄽` that appears to the left of the model selector.
 Release Mod to hide the rest. The plugin saves the latest note for that conversation
 in this browser and shows it at the end of the corresponding turn.
 The icons below the note are **Copy**, **Rewind**, and **Send**.
