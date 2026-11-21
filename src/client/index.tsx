@@ -1,4 +1,4 @@
-import { useCallback, useState, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type { SessionSnapshot } from '@deepseek-ai/dsh-api-session-controller/client'
@@ -56,17 +56,21 @@ export function apply(ctx: Context): void {
       const allowed = useAccess('session/prompt')
       const input = useInput((state: InputState) => state)
       const [failedSession, setFailedSession] = useState<string | null>(null)
-      if (endSeq === undefined || !idle || !allowed || input.queue.length > 0) return null
+      const modHeld = useModHeld()
+      const saveFailed = failedSession === sessionId
+      if (endSeq === undefined || !idle || !allowed || input.queue.length > 0 || (!modHeld && !saveFailed)) return null
 
       const canSave = canSaveDraft(input)
       return (
         <span style={{ display: 'inline-flex', alignItems: 'center' }}>
-          <IconButton label={t('save')} hint={canSave ? undefined : t('plainDraft')}
-            unavailable={!canSave} save onClick={() => {
-              const result = saveDraftAsNote(input, endSeq, note => notes.write(sessionId, note), inputActions)
-              setFailedSession(result === 'storage-error' ? sessionId : null)
-            }}><Icon name="rest" size={24} /></IconButton>
-          {failedSession === sessionId && (
+          {modHeld && (
+            <IconButton label={t('save')} hint={canSave ? undefined : t('plainDraft')}
+              unavailable={!canSave} save onClick={() => {
+                const result = saveDraftAsNote(input, endSeq, note => notes.write(sessionId, note), inputActions)
+                setFailedSession(result === 'storage-error' ? sessionId : null)
+              }}><Icon name="rest" size={24} /></IconButton>
+          )}
+          {saveFailed && (
             <span role="alert" style={{ color: 'var(--dsw-alias-label-primary)', fontSize: 12 }}>{t('saveFailed')}</span>
           )}
         </span>
@@ -96,6 +100,23 @@ export function apply(ctx: Context): void {
         onSend={() => { if (canSend) submitNote(input, note, inputActions) }} />
     }
   }, `${namespace}: composer and turn tail`)
+}
+
+function useModHeld(): boolean {
+  const [held, setHeld] = useState(false)
+  useEffect(() => {
+    const isMac = /^Mac/i.test(navigator.platform)
+    const controller = new AbortController()
+    const { signal } = controller
+    const update = (event: KeyboardEvent) => setHeld(isMac ? event.metaKey : event.ctrlKey)
+    const reset = () => setHeld(false)
+    window.addEventListener('keydown', update, { capture: true, passive: true, signal })
+    window.addEventListener('keyup', update, { capture: true, passive: true, signal })
+    window.addEventListener('blur', reset, { signal })
+    document.addEventListener('visibilitychange', reset, { signal })
+    return () => controller.abort()
+  }, [])
+  return held
 }
 
 function NoteCard({ note, t, canSend, onRewind, onSend }: {

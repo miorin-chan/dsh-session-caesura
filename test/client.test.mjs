@@ -18,21 +18,33 @@ function fakeStorage() {
   }
 }
 
-test('registers both localized slots and disposes its resources', async () => {
+test('registers localized slots, shows the rest while Mod is held and disposes its resources', async () => {
   let registration
   globalThis.window = Object.assign(new EventTarget(), { __ModuleLoader__: { load: entry => { registration = entry } } })
   const mountedStyles = new Set()
-  globalThis.document = {
+  globalThis.document = Object.assign(new EventTarget(), {
     createElement: () => ({ remove() { mountedStyles.delete(this) } }),
     head: { append: style => mountedStyles.add(style) },
-  }
+  })
   try {
     await import('../client.js')
     assert.equal(registration.id, NS)
     const effects = []
     const entries = new Map()
     const dictionaries = new Map()
-    const plugin = registration.factory(require)
+    const componentEffects = []
+    const state = []
+    let hookIndex = 0
+    const react = {
+      ...require('react'),
+      useEffect: install => { if (componentEffects.length === 0) componentEffects.push(install()) },
+      useState(initial) {
+        const index = hookIndex++
+        state[index] ??= initial
+        return [state[index], value => { state[index] = value }]
+      },
+    }
+    const plugin = registration.factory(id => id === 'react' ? react : require(id))
     plugin.apply({
       effect: install => effects.push(install()),
       slots: {
@@ -54,6 +66,54 @@ test('registers both localized slots and disposes its resources', async () => {
     assert.equal(entries.get('conversation.chat.turnTail').options.locale, NS)
     assert.equal(Object.keys(dictionaries.get(NS)).length, 8)
     assert.equal(mountedStyles.size, 1)
+
+    const composer = entries.get('conversation.input.right').component
+    let running = false
+    function renderComposer() {
+      hookIndex = 0
+      return composer({
+        sessionId: 'session', t: key => key,
+        useChat: select => select({ timeline: { turnOrder: ['turn'], turns: new Map([['turn', { end: { seq: 42 } }]]) } }),
+        useSession: select => select({ openState: 'open', running, pendingSubmissions: [], subagent: null }),
+        useAccess: () => true,
+        useInput: select => select({ ...draft, queue: [] }),
+      })
+    }
+    function key(type, modifier) {
+      const event = Object.assign(new Event(type, { cancelable: true }), { metaKey: false, ctrlKey: false }, modifier)
+      assert.equal(window.dispatchEvent(event), true)
+    }
+    const originalNavigator = Object.getOwnPropertyDescriptor(globalThis, 'navigator')
+    try {
+      for (const [platform, primary, secondary] of [
+        ['MacIntel', 'metaKey', 'ctrlKey'], ['Win32', 'ctrlKey', 'metaKey'],
+      ]) {
+        Object.defineProperty(globalThis, 'navigator', { configurable: true, value: { platform } })
+        assert.equal(renderComposer(), null)
+        key('keydown', { [secondary]: true })
+        assert.equal(renderComposer(), null)
+        key('keydown', { [primary]: true })
+        assert.equal(renderComposer().props.children[0].props.save, true)
+        running = true
+        assert.equal(renderComposer(), null)
+        running = false
+        key('keyup')
+        assert.equal(renderComposer(), null)
+        for (const [target, event] of [[window, 'blur'], [document, 'visibilitychange']]) {
+          key('keydown', { [primary]: true })
+          assert.ok(renderComposer())
+          target.dispatchEvent(new Event(event))
+          assert.equal(renderComposer(), null)
+        }
+        componentEffects.pop()()
+        key('keydown', { [primary]: true })
+        assert.equal(state[1], false)
+      }
+    } finally {
+      if (originalNavigator) Object.defineProperty(globalThis, 'navigator', originalNavigator)
+      else delete globalThis.navigator
+    }
+
     effects.reverse().forEach(dispose => dispose())
     assert.equal(entries.size, 0)
     assert.equal(dictionaries.size, 0)

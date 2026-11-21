@@ -409,10 +409,12 @@ function apply(ctx) {
       const allowed = useAccess("session/prompt");
       const input = useInput((state) => state);
       const [failedSession, setFailedSession] = (0, import_react2.useState)(null);
-      if (endSeq === void 0 || !idle || !allowed || input.queue.length > 0) return null;
+      const modHeld = useModHeld();
+      const saveFailed = failedSession === sessionId;
+      if (endSeq === void 0 || !idle || !allowed || input.queue.length > 0 || !modHeld && !saveFailed) return null;
       const canSave = canSaveDraft(input);
       return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("span", { style: { display: "inline-flex", alignItems: "center" }, children: [
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
+        modHeld && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
           IconButton,
           {
             label: t("save"),
@@ -426,7 +428,7 @@ function apply(ctx) {
             children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Icon, { name: "rest", size: 24 })
           }
         ),
-        failedSession === sessionId && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { role: "alert", style: { color: "var(--dsw-alias-label-primary)", fontSize: 12 }, children: t("saveFailed") })
+        saveFailed && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { role: "alert", style: { color: "var(--dsw-alias-label-primary)", fontSize: 12 }, children: t("saveFailed") })
       ] });
     }
     function NoteAtTurnEnd({ turn, sessionId, t, useInput, inputActions, useAccess, useSession }) {
@@ -469,6 +471,22 @@ function apply(ctx) {
       );
     }
   }, `${namespace}: composer and turn tail`);
+}
+function useModHeld() {
+  const [held, setHeld] = (0, import_react2.useState)(false);
+  (0, import_react2.useEffect)(() => {
+    const isMac = /^Mac/i.test(navigator.platform);
+    const controller = new AbortController();
+    const { signal } = controller;
+    const update = (event) => setHeld(isMac ? event.metaKey : event.ctrlKey);
+    const reset = () => setHeld(false);
+    window.addEventListener("keydown", update, { capture: true, passive: true, signal });
+    window.addEventListener("keyup", update, { capture: true, passive: true, signal });
+    window.addEventListener("blur", reset, { signal });
+    document.addEventListener("visibilitychange", reset, { signal });
+    return () => controller.abort();
+  }, []);
+  return held;
 }
 function NoteCard({ note, t, canSend, onRewind, onSend }) {
   const { status, copy } = useNoteCopy(note.text);
