@@ -168,7 +168,8 @@ var styles = `
 .dsh-cn-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 `;
 var artwork = {
-  rest: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "m9.1 2.4 6.2 7-4 3.6 4 4.3c-3.8-1.1-6.1 1.1-4.1 4.3" }),
+  // Bravura SMuFL restQuarter (U+E4E5), scaled to the icon viewport. See docs/bravura-OFL.txt.
+  rest: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { fill: "currentColor", stroke: "none", d: "\n    M10.39 13.04 C10.83 13.6 11.23 14.13 11.59 14.72 C11.65 14.84 11.76 15.06 11.76 15.12 C11.76 15.14 11.76\n    15.2 11.73 15.23 C11.68 15.34 11.56 15.37 11.42 15.37 C11.31 15.37 11.09 15.31 10.98 15.28 C10.83 15.28\n    10.67 15.2 10.53 15.2 C9.32 15.2 8.22 16.41 8.22 17.9 C8.22 19.3 9.43 20.68 11.48 22.25 C11.71 22.42\n    11.99 22.5 12.21 22.5 C12.41 22.5 12.6 22.44 12.63 22.33 C12.66 22.25 12.69 22.19 12.69 22.14 C12.69\n    21.88 12.46 21.66 12.24 21.46 C11.87 21.46 11.56 20.7 11.51 20.45 C11.42 20.23 11.4 19.97 11.4 19.72\n    C11.4 18.85 11.82 17.87 12.72 17.7 C12.86 17.67 13 17.67 13.17 17.67 C13.98 17.67 14.91 17.98 15.35 18.15\n    C15.38 18.15 15.41 18.18 15.44 18.18 C15.52 18.2 15.58 18.2 15.64 18.2 C15.72 18.2 15.78 18.18 15.78\n    18.09 C15.78 17.76 15.05 16.83 14.74 16.49 C13.67 15.2 12.8 14.16 12.8 12.59 C12.8 12.48 12.83 12.34\n    12.83 12.22 C12.94 10.6 13.95 9.25 14.68 8.1 C14.77 7.96 14.79 7.82 14.79 7.68 C14.79 7.4 14.68 7.14\n    14.68 7.14 C14.68 7.14 10.53 2.2 10.05 1.72 C9.91 1.58 9.71 1.5 9.54 1.5 C9.26 1.5 8.98 1.7 8.98 2.09\n    C8.98 2.23 9.01 2.37 9.09 2.54 C9.21 2.85 10.81 4.28 10.81 6.3 C10.81 7.34 10.39 8.55 9.12 9.87 C8.84\n    10.15 8.73 10.46 8.73 10.68 C8.73 11.07 9.01 11.35 9.01 11.35 Z\n  " }),
   copy: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
     /* @__PURE__ */ (0, import_jsx_runtime.jsx)("rect", { x: "8", y: "8", width: "12", height: "12", rx: "2" }),
     /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" })
@@ -194,7 +195,7 @@ function Icon({ name, size = 17 }) {
       viewBox: "0 0 24 24",
       fill: "none",
       stroke: "currentColor",
-      strokeWidth: name === "rest" ? 2.5 : 1.65,
+      strokeWidth: 1.65,
       strokeLinecap: "round",
       strokeLinejoin: "round",
       children: artwork[name]

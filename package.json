@@ -1,6 +1,6 @@
 {
   "name": "dsh-closing-note",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "license": "MIT",
   "description": "Save a private note at the end of an idle conversation.",
@@ -27,7 +27,8 @@
     "AGENTS.local.md",
     "docs/README.md",
     "README.zh.md",
-    "lib/*.js"
+    "lib/*.js",
+    "docs/bravura-OFL.txt"
   ],
   "engines": {
     "dsh": "0.2.2-rc.5"
