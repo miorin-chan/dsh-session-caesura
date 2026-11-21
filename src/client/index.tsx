@@ -11,7 +11,7 @@ import { canSaveDraft, canSendNote, createNoteStore, readNote, restoreNote, save
 import { Icon, IconButton, styles, useNoteCopy } from './appearance.js'
 import { labels } from './labels.js'
 
-const namespace = 'dsh-closing-note'
+const namespace = 'dsh-session-caesura'
 const inputSlot = 'conversation.input.right'
 const tailSlot = 'conversation.chat.turnTail'
 
@@ -19,7 +19,7 @@ export const inject = ['slots', 'locale']
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
-    'dsh-closing-note': keyof typeof labels.en
+    'dsh-session-caesura': keyof typeof labels.en
   }
 }
 
@@ -109,7 +109,7 @@ function NoteCard({ note, t, canSend, onRewind, onSend }: {
   const [rewindFailed, setRewindFailed] = useState(false)
   const hint = canSend ? undefined : t('emptyDraft')
   return (
-    <section className="dsh-cn-note" data-dsh-closing-note aria-label={t('title')}>
+    <section className="dsh-cn-note" data-dsh-session-caesura aria-label={t('title')}>
       <div className="dsh-cn-title"><Icon name="rest" size={15} />{t('title')}</div>
       <div className="dsh-cn-bubble">{note.text}</div>
       <div className="dsh-cn-actions">

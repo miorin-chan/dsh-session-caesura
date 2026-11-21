@@ -4,7 +4,7 @@ import { test } from 'node:test'
 import { createNoteStore, readNote, restoreNote, saveDraftAsNote, submitNote } from '../lib/notes.js'
 
 const require = createRequire(import.meta.url)
-const NS = 'dsh-closing-note'
+const NS = 'dsh-session-caesura'
 const empty = { draft: '', phase: 'plain', attachmentIds: [], occurrences: [] }
 const draft = { ...empty, draft: 'For tomorrow\n  second line' }
 const note = { endSeq: 42, text: draft.draft }
@@ -106,6 +106,8 @@ test('keeps only the latest note per session and refreshes subscribed readers', 
   const storage = fakeStorage()
   const events = new EventTarget()
   const store = createNoteStore(() => storage, events)
+  storage.setItem('dsh.closing-note.a', JSON.stringify(note))
+  assert.deepEqual(readNote(store.read('a')), note)
   let updates = 0
   const unsubscribe = store.subscribe('a', () => { updates++ })
   store.write('a', note)

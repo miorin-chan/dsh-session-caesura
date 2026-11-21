@@ -75,6 +75,7 @@ export function submitNote(input: InputDraft, note: ClosingNote, actions: DraftA
 }
 
 export function createNoteStore(getStorage: () => Storage, events: Window) {
+  // Keep stored notes readable across plugin renames.
   const prefix = 'dsh.closing-note.'
   const listeners = new Map<string, Set<() => void>>()
   const publish = (key: string) => { listeners.get(key)?.forEach(listener => listener()) }

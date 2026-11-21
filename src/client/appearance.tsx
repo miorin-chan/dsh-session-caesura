@@ -77,7 +77,7 @@ export function IconButton({ label, hint, unavailable = false, save = false, onC
 }) {
   const description = hint ?? label
   return <button type="button" className={`dsh-cn-button${save ? ' dsh-cn-save' : ''}`}
-    data-dsh-closing-note-save={save ? '' : undefined} aria-label={label} aria-disabled={unavailable || undefined}
+    data-dsh-session-caesura-save={save ? '' : undefined} aria-label={label} aria-disabled={unavailable || undefined}
     aria-description={hint} title={description}
     onMouseDown={save ? event => event.preventDefault() : undefined}
     onClick={() => { if (!unavailable) onClick() }}>{children}</button>
