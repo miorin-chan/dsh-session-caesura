@@ -1,4 +1,4 @@
-# Caesura · Closing note
+# Caesura
 
 [简体中文](README.zh.md)
 
