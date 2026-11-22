@@ -23,17 +23,18 @@ export const styles = `
   color: var(--dsw-alias-label-tertiary, var(--dsw-alias-label-secondary)); cursor: pointer;
 }
 /* Overlay the primary action from the right slot without adding toolbar width.
-   Geometry and colors follow @deepseek-ai/dsh-client-ui-conversation 0.2.2-rc.5,
+   Geometry and card background follow @deepseek-ai/dsh-client-ui-conversation 0.2.2-rc.5,
    src/client/skeleton/InputBar.module.css (.card, .row, .primary, .trailing).
    Copyright (c) 2026 DeepSeek, MIT. See docs/dsh-ui-MIT.txt. */
 .dsh-cn-button.dsh-cn-save {
   position: absolute;
   right: 8px; bottom: 8px; z-index: 1;
   width: 34px; height: 34px;
-  border-radius: 999px; corner-shape: round;
-  background: var(--dsw-alias-button-info-fill);
-  color: var(--dsw-alias-label-on-color);
-  transition: background-color 100ms ease;
+  border: 1px solid var(--dsw-alias-border-l4);
+  border-radius: 50%; corner-shape: round;
+  /* Match the card behind the original outline and cover the native arrow. */
+  background: var(--dsw-specific-input-major);
+  color: var(--dsw-alias-label-secondary);
 }
 .dsh-cn-save-error {
   box-sizing: border-box;
@@ -55,12 +56,11 @@ export const styles = `
   outline-offset: -2px;
 }
 @media (hover: hover) {
-  .dsh-cn-button:not(.dsh-cn-save):not([aria-disabled='true']):hover {
+  .dsh-cn-button:not([aria-disabled='true']):hover {
     color: var(--dsw-alias-label-primary);
-    background: var(--dsw-alias-interactive-bg-hover);
   }
-  .dsh-cn-button.dsh-cn-save:hover {
-    background: var(--dsw-alias-button-info-hover);
+  .dsh-cn-button:not(.dsh-cn-save):not([aria-disabled='true']):hover {
+    background: var(--dsw-alias-interactive-bg-hover);
   }
 }
 .dsh-cn-status { color: var(--dsw-alias-state-error-primary); font-size: 12px; }

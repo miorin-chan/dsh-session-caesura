@@ -68,7 +68,7 @@ export function apply(ctx: Context): void {
             <IconButton label={t('save')} save onClick={() => {
               const result = saveDraftAsNote(input, endSeq, note => notes.write(sessionId, note), inputActions)
               setFailedDraft(result === 'storage-error' ? { sessionId, revision: input.draftRev } : null)
-            }}><Icon name="rest" size={20} /></IconButton>
+            }}><Icon name="rest" size={24} /></IconButton>
           )}
           {saveFailed && <span role="alert" className="dsh-cn-save-error">{t('saveFailed')}</span>}
         </>
