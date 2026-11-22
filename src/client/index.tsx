@@ -55,25 +55,23 @@ export function apply(ctx: Context): void {
         && state.pendingSubmissions.length === 0 && state.subagent === null)
       const allowed = useAccess('session/prompt')
       const input = useInput((state: InputState) => state)
-      const [failedSession, setFailedSession] = useState<string | null>(null)
+      const [failedDraft, setFailedDraft] = useState<{ sessionId: string; revision: number } | null>(null)
       const modHeld = useModHeld()
-      const saveFailed = failedSession === sessionId
-      if (endSeq === undefined || !idle || !allowed || input.queue.length > 0 || (!modHeld && !saveFailed)) return null
+      const saveFailed = failedDraft?.sessionId === sessionId && failedDraft.revision === input.draftRev
+      if (endSeq === undefined || !idle || !allowed || input.queue.length > 0) return null
 
-      const canSave = canSaveDraft(input)
+      const showRest = modHeld && canSaveDraft(input)
+      if (!showRest && !saveFailed) return null
       return (
-        <span style={{ display: 'inline-flex', alignItems: 'center' }}>
-          {modHeld && (
-            <IconButton label={t('save')} hint={canSave ? undefined : t('plainDraft')}
-              unavailable={!canSave} save onClick={() => {
-                const result = saveDraftAsNote(input, endSeq, note => notes.write(sessionId, note), inputActions)
-                setFailedSession(result === 'storage-error' ? sessionId : null)
-              }}><Icon name="rest" size={24} /></IconButton>
+        <>
+          {showRest && (
+            <IconButton label={t('save')} save onClick={() => {
+              const result = saveDraftAsNote(input, endSeq, note => notes.write(sessionId, note), inputActions)
+              setFailedDraft(result === 'storage-error' ? { sessionId, revision: input.draftRev } : null)
+            }}><Icon name="rest" size={20} /></IconButton>
           )}
-          {saveFailed && (
-            <span role="alert" style={{ color: 'var(--dsw-alias-label-primary)', fontSize: 12 }}>{t('saveFailed')}</span>
-          )}
-        </span>
+          {saveFailed && <span role="alert" className="dsh-cn-save-error">{t('saveFailed')}</span>}
+        </>
       )
     }
 

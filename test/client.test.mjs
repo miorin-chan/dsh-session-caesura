@@ -69,6 +69,7 @@ test('registers localized slots, shows the rest while Mod is held and disposes i
 
     const composer = entries.get('conversation.input.right').component
     let running = false
+    let currentDraft = draft
     function renderComposer() {
       hookIndex = 0
       return composer({
@@ -76,7 +77,7 @@ test('registers localized slots, shows the rest while Mod is held and disposes i
         useChat: select => select({ timeline: { turnOrder: ['turn'], turns: new Map([['turn', { end: { seq: 42 } }]]) } }),
         useSession: select => select({ openState: 'open', running, pendingSubmissions: [], subagent: null }),
         useAccess: () => true,
-        useInput: select => select({ ...draft, queue: [] }),
+        useInput: select => select({ ...currentDraft, queue: [] }),
       })
     }
     function key(type, modifier) {
@@ -94,6 +95,12 @@ test('registers localized slots, shows the rest while Mod is held and disposes i
         assert.equal(renderComposer(), null)
         key('keydown', { [primary]: true })
         assert.equal(renderComposer().props.children[0].props.save, true)
+        for (const ineligible of [empty, { ...draft, draft: '/model' },
+          { ...draft, attachmentIds: ['file'] }, { ...draft, occurrences: ['chip'] }]) {
+          currentDraft = ineligible
+          assert.equal(renderComposer(), null)
+        }
+        currentDraft = draft
         running = true
         assert.equal(renderComposer(), null)
         running = false

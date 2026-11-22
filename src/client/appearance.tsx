@@ -22,12 +22,32 @@ export const styles = `
   padding: 0; border: 0; border-radius: var(--dsw-radius-sm); background: transparent;
   color: var(--dsw-alias-label-tertiary, var(--dsw-alias-label-secondary)); cursor: pointer;
 }
+/* Overlay the primary action from the right slot without adding toolbar width.
+   Geometry and colors follow @deepseek-ai/dsh-client-ui-conversation 0.2.2-rc.5,
+   src/client/skeleton/InputBar.module.css (.card, .row, .primary, .trailing).
+   Copyright (c) 2026 DeepSeek, MIT. See docs/dsh-ui-MIT.txt. */
 .dsh-cn-button.dsh-cn-save {
+  position: absolute;
+  right: 8px; bottom: 8px; z-index: 1;
   width: 34px; height: 34px;
-  border: 1px solid var(--dsw-alias-border-l4);
-  border-radius: 50%; corner-shape: round;
-  color: var(--dsw-alias-label-secondary);
-  transform: translateY(-2px);
+  border-radius: 999px; corner-shape: round;
+  background: var(--dsw-alias-button-info-fill);
+  color: var(--dsw-alias-label-on-color);
+  transition: background-color 100ms ease;
+}
+.dsh-cn-save-error {
+  box-sizing: border-box;
+  position: absolute;
+  right: 8px; bottom: 50px; z-index: 1;
+  max-width: calc(100% - 16px);
+  padding: 4px 8px;
+  border-radius: var(--dsw-radius-md);
+  background: var(--dsw-specific-input-major);
+  box-shadow: var(--dsw-elevation-soft);
+  color: var(--dsw-alias-state-error-primary);
+  font-size: var(--dsh-content-font-size-secondary, 13px);
+  line-height: 1.4;
+  pointer-events: none;
 }
 .dsh-cn-button[aria-disabled='true'] { opacity: 0.45; cursor: default; }
 .dsh-cn-button:focus-visible {
@@ -35,11 +55,12 @@ export const styles = `
   outline-offset: -2px;
 }
 @media (hover: hover) {
-  .dsh-cn-button:not([aria-disabled='true']):hover {
-    color: var(--dsw-alias-label-primary);
-  }
   .dsh-cn-button:not(.dsh-cn-save):not([aria-disabled='true']):hover {
+    color: var(--dsw-alias-label-primary);
     background: var(--dsw-alias-interactive-bg-hover);
+  }
+  .dsh-cn-button.dsh-cn-save:hover {
+    background: var(--dsw-alias-button-info-hover);
   }
 }
 .dsh-cn-status { color: var(--dsw-alias-state-error-primary); font-size: 12px; }

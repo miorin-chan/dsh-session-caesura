@@ -28,7 +28,8 @@
     "docs/README.md",
     "README.zh.md",
     "lib/*.js",
-    "docs/bravura-OFL.txt"
+    "docs/bravura-OFL.txt",
+    "docs/dsh-ui-MIT.txt"
   ],
   "engines": {
     "dsh": "0.2.2-rc.5"

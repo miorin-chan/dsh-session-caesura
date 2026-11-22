@@ -153,12 +153,32 @@ var styles = `
   padding: 0; border: 0; border-radius: var(--dsw-radius-sm); background: transparent;
   color: var(--dsw-alias-label-tertiary, var(--dsw-alias-label-secondary)); cursor: pointer;
 }
+/* Overlay the primary action from the right slot without adding toolbar width.
+   Geometry and colors follow @deepseek-ai/dsh-client-ui-conversation 0.2.2-rc.5,
+   src/client/skeleton/InputBar.module.css (.card, .row, .primary, .trailing).
+   Copyright (c) 2026 DeepSeek, MIT. See docs/dsh-ui-MIT.txt. */
 .dsh-cn-button.dsh-cn-save {
+  position: absolute;
+  right: 8px; bottom: 8px; z-index: 1;
   width: 34px; height: 34px;
-  border: 1px solid var(--dsw-alias-border-l4);
-  border-radius: 50%; corner-shape: round;
-  color: var(--dsw-alias-label-secondary);
-  transform: translateY(-2px);
+  border-radius: 999px; corner-shape: round;
+  background: var(--dsw-alias-button-info-fill);
+  color: var(--dsw-alias-label-on-color);
+  transition: background-color 100ms ease;
+}
+.dsh-cn-save-error {
+  box-sizing: border-box;
+  position: absolute;
+  right: 8px; bottom: 50px; z-index: 1;
+  max-width: calc(100% - 16px);
+  padding: 4px 8px;
+  border-radius: var(--dsw-radius-md);
+  background: var(--dsw-specific-input-major);
+  box-shadow: var(--dsw-elevation-soft);
+  color: var(--dsw-alias-state-error-primary);
+  font-size: var(--dsh-content-font-size-secondary, 13px);
+  line-height: 1.4;
+  pointer-events: none;
 }
 .dsh-cn-button[aria-disabled='true'] { opacity: 0.45; cursor: default; }
 .dsh-cn-button:focus-visible {
@@ -166,11 +186,12 @@ var styles = `
   outline-offset: -2px;
 }
 @media (hover: hover) {
-  .dsh-cn-button:not([aria-disabled='true']):hover {
-    color: var(--dsw-alias-label-primary);
-  }
   .dsh-cn-button:not(.dsh-cn-save):not([aria-disabled='true']):hover {
+    color: var(--dsw-alias-label-primary);
     background: var(--dsw-alias-interactive-bg-hover);
+  }
+  .dsh-cn-button.dsh-cn-save:hover {
+    background: var(--dsw-alias-button-info-hover);
   }
 }
 .dsh-cn-status { color: var(--dsw-alias-state-error-primary); font-size: 12px; }
@@ -265,7 +286,6 @@ function useNoteCopy(text) {
 var en = {
   title: "Closing note",
   save: "Save as closing note",
-  plainDraft: "Enter a plain-text draft to save a note",
   saveFailed: "Could not save the note. Your draft is still in the composer.",
   copy: "Copy",
   copyFailed: "Could not copy",
@@ -280,7 +300,6 @@ var labels = {
   zh: {
     title: "\u7ED3\u8BED\u7B14\u8BB0",
     save: "\u4FDD\u5B58\u4E3A\u7ED3\u8BED\u7B14\u8BB0",
-    plainDraft: "\u8F93\u5165\u7EAF\u6587\u672C\u8349\u7A3F\u540E\u5373\u53EF\u4FDD\u5B58",
     saveFailed: "\u65E0\u6CD5\u4FDD\u5B58\u7ED3\u8BED\u7B14\u8BB0\uFF0C\u539F\u7A3F\u4ECD\u5728\u8F93\u5165\u6846",
     copy: "\u590D\u5236",
     copyFailed: "\u590D\u5236\u5931\u8D25",
@@ -293,7 +312,6 @@ var labels = {
   ja: {
     title: "\u7DE0\u3081\u304F\u304F\u308A\u30E1\u30E2",
     save: "\u7DE0\u3081\u304F\u304F\u308A\u30E1\u30E2\u3068\u3057\u3066\u4FDD\u5B58",
-    plainDraft: "\u30C6\u30AD\u30B9\u30C8\u306E\u4E0B\u66F8\u304D\u3092\u5165\u529B\u3059\u308B\u3068\u4FDD\u5B58\u3067\u304D\u307E\u3059",
     saveFailed: "\u30E1\u30E2\u3092\u4FDD\u5B58\u3067\u304D\u307E\u305B\u3093\u3067\u3057\u305F\u3002\u4E0B\u66F8\u304D\u306F\u5165\u529B\u6B04\u306B\u6B8B\u3063\u3066\u3044\u307E\u3059\u3002",
     copy: "\u30B3\u30D4\u30FC",
     copyFailed: "\u30B3\u30D4\u30FC\u3067\u304D\u307E\u305B\u3093\u3067\u3057\u305F",
@@ -306,7 +324,6 @@ var labels = {
   de: {
     title: "Abschlussnotiz",
     save: "Als Abschlussnotiz speichern",
-    plainDraft: "Entwurf als reinen Text eingeben, um ihn zu speichern",
     saveFailed: "Die Notiz konnte nicht gespeichert werden. Der Entwurf steht weiterhin im Eingabefeld.",
     copy: "Kopieren",
     copyFailed: "Kopieren fehlgeschlagen",
@@ -319,7 +336,6 @@ var labels = {
   es: {
     title: "Nota de cierre",
     save: "Guardar como nota de cierre",
-    plainDraft: "Escribe un borrador en texto plano para guardarlo",
     saveFailed: "No se pudo guardar la nota. El borrador sigue en el campo de texto.",
     copy: "Copiar",
     copyFailed: "No se pudo copiar",
@@ -332,7 +348,6 @@ var labels = {
   fr: {
     title: "Note de fin",
     save: "Enregistrer comme note de fin",
-    plainDraft: "Saisissez un brouillon en texte brut pour l\u2019enregistrer",
     saveFailed: "Impossible d\u2019enregistrer la note. Votre brouillon est toujours dans le champ de saisie.",
     copy: "Copier",
     copyFailed: "\xC9chec de la copie",
@@ -345,7 +360,6 @@ var labels = {
   pt: {
     title: "Nota de encerramento",
     save: "Salvar como nota de encerramento",
-    plainDraft: "Digite um rascunho em texto simples para salvar",
     saveFailed: "N\xE3o foi poss\xEDvel salvar a nota. O rascunho continua no campo de texto.",
     copy: "Copiar",
     copyFailed: "N\xE3o foi poss\xEDvel copiar",
@@ -358,7 +372,6 @@ var labels = {
   ru: {
     title: "\u0417\u0430\u043A\u043B\u044E\u0447\u0438\u0442\u0435\u043B\u044C\u043D\u0430\u044F \u0437\u0430\u043C\u0435\u0442\u043A\u0430",
     save: "\u0421\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C \u043A\u0430\u043A \u0437\u0430\u043A\u043B\u044E\u0447\u0438\u0442\u0435\u043B\u044C\u043D\u0443\u044E \u0437\u0430\u043C\u0435\u0442\u043A\u0443",
-    plainDraft: "\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u0442\u0435\u043A\u0441\u0442 \u0447\u0435\u0440\u043D\u043E\u0432\u0438\u043A\u0430, \u0447\u0442\u043E\u0431\u044B \u0441\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C \u0437\u0430\u043C\u0435\u0442\u043A\u0443",
     saveFailed: "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0441\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C \u0437\u0430\u043C\u0435\u0442\u043A\u0443. \u0427\u0435\u0440\u043D\u043E\u0432\u0438\u043A \u043E\u0441\u0442\u0430\u043B\u0441\u044F \u0432 \u043F\u043E\u043B\u0435 \u0432\u0432\u043E\u0434\u0430.",
     copy: "\u041A\u043E\u043F\u0438\u0440\u043E\u0432\u0430\u0442\u044C",
     copyFailed: "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0441\u043A\u043E\u043F\u0438\u0440\u043E\u0432\u0430\u0442\u044C",
@@ -408,27 +421,18 @@ function apply(ctx) {
       const idle = useSession((state) => state.openState === "open" && !state.running && !state.removed && state.pendingSubmissions.length === 0 && state.subagent === null);
       const allowed = useAccess("session/prompt");
       const input = useInput((state) => state);
-      const [failedSession, setFailedSession] = (0, import_react2.useState)(null);
+      const [failedDraft, setFailedDraft] = (0, import_react2.useState)(null);
       const modHeld = useModHeld();
-      const saveFailed = failedSession === sessionId;
-      if (endSeq === void 0 || !idle || !allowed || input.queue.length > 0 || !modHeld && !saveFailed) return null;
-      const canSave = canSaveDraft(input);
-      return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("span", { style: { display: "inline-flex", alignItems: "center" }, children: [
-        modHeld && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
-          IconButton,
-          {
-            label: t("save"),
-            hint: canSave ? void 0 : t("plainDraft"),
-            unavailable: !canSave,
-            save: true,
-            onClick: () => {
-              const result = saveDraftAsNote(input, endSeq, (note) => notes.write(sessionId, note), inputActions);
-              setFailedSession(result === "storage-error" ? sessionId : null);
-            },
-            children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Icon, { name: "rest", size: 24 })
-          }
-        ),
-        saveFailed && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { role: "alert", style: { color: "var(--dsw-alias-label-primary)", fontSize: 12 }, children: t("saveFailed") })
+      const saveFailed = failedDraft?.sessionId === sessionId && failedDraft.revision === input.draftRev;
+      if (endSeq === void 0 || !idle || !allowed || input.queue.length > 0) return null;
+      const showRest = modHeld && canSaveDraft(input);
+      if (!showRest && !saveFailed) return null;
+      return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(import_jsx_runtime2.Fragment, { children: [
+        showRest && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(IconButton, { label: t("save"), save: true, onClick: () => {
+          const result = saveDraftAsNote(input, endSeq, (note) => notes.write(sessionId, note), inputActions);
+          setFailedDraft(result === "storage-error" ? { sessionId, revision: input.draftRev } : null);
+        }, children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Icon, { name: "rest", size: 20 }) }),
+        saveFailed && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { role: "alert", className: "dsh-cn-save-error", children: t("saveFailed") })
       ] });
     }
     function NoteAtTurnEnd({ turn, sessionId, t, useInput, inputActions, useAccess, useSession }) {

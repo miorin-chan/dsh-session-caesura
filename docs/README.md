@@ -5,3 +5,17 @@
 在插件目录执行 `npm ci`、`npm run build` 和 `npm run check`。
 检查涵盖行为、类型、产物与运行版本。
 在工作区根目录执行 `node tools/new-dsh-plugin/cli.mjs --check plugins/dsh-session-caesura` 校验插件骨架。
+
+## 发送位置的休止符
+
+`conversation.input.right` 在按住 Mod 且草稿合格时渲染一个绝对定位的按钮。
+它的尺寸、偏移和颜色取自 DSH 0.2.2-rc.5 的 `InputBar.module.css`，升级运行时后需重新比对。
+原生发送仍负责键盘发送。录音展开时，宿主隐藏右插槽，麦克风收起后按当前 Mod 和草稿状态恢复休止符。
+
+在隔离 profile 的 Chrome 中检查 1280、360、320 CSS px 的视口宽度。
+休止符和原生发送的 34×34 px 边界重合，按键切换不移动工具栏，录音展开和取消均正确。
+验证使用官方语音界面、Chrome 模拟麦克风，以及本地语音和模型夹具。
+存储失败时保留原稿并显示提示，编辑草稿后提示消失。
+点击休止符将原稿保存为本地结语，模型夹具的请求次数不增加。
+普通点击和 Enter 均完成原生发送。
+原生按钮预先获得焦点时，按住 Mod 显示休止符，松键后仍可按 Enter 发送。
