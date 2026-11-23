@@ -67,7 +67,7 @@ export function apply(ctx: Context): void {
       const available = ready && canSaveDraft(input)
       const save = useCallback(() => {
         if (!available || inputActions.captureInsertion().draftRev !== input.draftRev) return
-        const result = saveDraftAsNote(input, endSeq, note => notes.write(sessionId, note), inputActions)
+        const result = saveDraftAsNote(input, endSeq, note => notes.append(sessionId, note), inputActions)
         setFailedDraft(result === 'storage-error' ? { sessionId, revision: input.draftRev } : null)
       }, [available, endSeq, input, inputActions, sessionId])
       const anchor = useComposerSaveAnchor(available, save)

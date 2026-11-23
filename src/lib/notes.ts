@@ -92,9 +92,18 @@ export function createNoteStore(getStorage: () => Storage, events: Window) {
         return null
       }
     },
-    write(sessionId: string, note: ClosingNote): void {
+    append(sessionId: string, note: ClosingNote): void {
+      const storage = getStorage()
       const key = prefix + sessionId
-      getStorage().setItem(key, JSON.stringify(note))
+      const current = readNote(storage.getItem(key))
+      let text = note.text
+      if (current !== null) {
+        // Remove blank lines at the join while preserving the text and indentation of each note.
+        const previous = current.text.replace(/(\S[^\S\r\n]*)[\r\n]\s*$/, '$1')
+        const next = note.text.replace(/^(?:[^\S\r\n]*[\r\n])+/, '')
+        text = `${previous}\n\n${next}`
+      }
+      storage.setItem(key, JSON.stringify({ endSeq: note.endSeq, text }))
       publish(key)
     },
     remove(sessionId: string, note: ClosingNote): void {

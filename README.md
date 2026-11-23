@@ -10,8 +10,9 @@ Supports DeepSeek Harness 0.2.2-rc.5.
 After a turn finishes, enter a draft and hold Mod (Command on macOS, Ctrl on Windows and Linux).
 For an eligible draft, the send button shows a quarter rest `𝄽`.
 Click it or press Mod+Enter in the editor to save a closing note.
-Release Mod to see the send arrow again. The plugin saves the latest note for that conversation
-in this browser and shows it at the end of the corresponding turn.
+Release Mod to see the send arrow again. The plugin keeps one closing note per conversation
+in this browser and shows it at the end of the turn where you last saved it.
+If a note already exists, saving appends the new text after a blank line.
 In browsers that support CSS `reading-flow`, the note appears below the reply's action row.
 The icons below the note are **Copy**, **Rewind**, and **Send**.
 A check mark briefly replaces the copy icon on success.

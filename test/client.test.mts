@@ -173,18 +173,21 @@ test('uses ordinary submission only when the composer is empty', () => {
   assert.deepEqual(calls, [['draft', note.text], ['persist'], ['submit']])
 })
 
-test('keeps only the latest note per session and refreshes subscribed readers', () => {
+test('appends to the saved note with one blank line and refreshes subscribed readers', () => {
   const storage = fakeStorage()
   const events = new EventTarget()
   const store = createNoteStore(() => storage, events)
-  storage.setItem('dsh.closing-note.a', JSON.stringify(note))
-  assert.deepEqual(readNote(store.read('a')), note)
+  const existing = { ...note, text: `${note.text}\r\n \t\r\n` }
+  storage.setItem('dsh.closing-note.a', JSON.stringify(existing))
+  assert.deepEqual(readNote(store.read('a')), existing)
   let updates = 0
   const unsubscribe = store.subscribe('a', () => { updates++ })
-  store.write('a', note)
-  store.write('a', { ...note, endSeq: 51 })
+  store.append('a', { endSeq: 42, text: '\n\t\n  Next note' })
+  const appended = { endSeq: 42, text: `${note.text}\n\n  Next note` }
+  assert.deepEqual(readNote(store.read('a')), appended)
+  store.append('a', { endSeq: 51, text: 'After another turn' })
   assert.equal(updates, 2)
-  assert.deepEqual(readNote(store.read('a')), { ...note, endSeq: 51 })
+  assert.deepEqual(readNote(store.read('a')), { endSeq: 51, text: `${appended.text}\n\nAfter another turn` })
   assert.equal(readNote(store.read('b')), null)
   const event = new Event('storage')
   Object.defineProperty(event, 'key', { value: 'dsh.closing-note.a' })
@@ -203,19 +206,22 @@ test('rewind restores the note without sending and only removes the matching sav
   const storage = fakeStorage()
   const store = createNoteStore(() => storage, new EventTarget())
   let current = draft.draft
+  const persisted = []
   const actions = {
     setDraft: text => { current = text },
-    persistDraft: () => assert.equal(current, note.text),
+    persistDraft: () => persisted.push(current),
     submit: () => assert.fail('rewind must not send'),
   }
-  store.write('a', note)
+  store.append('a', note)
   assert.equal(restoreNote(draft, note, actions), false)
   assert.deepEqual(readNote(store.read('a')), note)
-  assert.equal(restoreNote(empty, note, actions), true)
-  store.write('a', { ...note, text: 'New note' })
+  store.append('a', { ...note, text: 'New note' })
   store.remove('a', note)
-  assert.equal(readNote(store.read('a')).text, 'New note')
-  store.remove('a', { ...note, text: 'New note' })
+  const combined = readNote(store.read('a'))
+  assert.deepEqual(combined, { ...note, text: `${note.text}\n\nNew note` })
+  assert.equal(restoreNote(empty, combined, actions), true)
+  assert.deepEqual(persisted, [combined.text])
+  store.remove('a', combined)
   assert.equal(readNote(store.read('a')), null)
   store.dispose()
 })
