@@ -12,6 +12,7 @@ For an eligible draft, the send button shows a quarter rest `𝄽`.
 Click it or press Mod+Enter in the editor to save a closing note.
 Release Mod to see the send arrow again. The plugin saves the latest note for that conversation
 in this browser and shows it at the end of the corresponding turn.
+In browsers that support CSS `reading-flow`, the note appears below the reply's action row.
 The icons below the note are **Copy**, **Rewind**, and **Send**.
 A check mark briefly replaces the copy icon on success.
 When the composer is available and empty, Rewind moves the note back for editing and Send submits a copy.

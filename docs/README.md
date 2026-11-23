@@ -6,6 +6,13 @@
 检查涵盖行为、类型、产物与运行版本。
 在工作区根目录执行 `node tools/new-dsh-plugin/cli.mts --check plugins/dsh-session-caesura` 校验插件骨架。
 
+## 结语笔记的位置
+
+在支持 `reading-flow` 的浏览器里，保存结语后检查对应回答的操作栏位于笔记上方。
+发送下一条消息，检查结语仍跟在原回答之后。点击回退应删除笔记并恢复原稿。
+只有结语时，Tab 从回答操作栏进入笔记操作区。
+同一回合有其他尾部卡片时，Chromium 会把卡片和结语放进同一焦点组，Tab 可能先经过结语。
+
 ## 发送位置的休止符
 
 `conversation.input.right` 在按住 Mod 且草稿合格时渲染一个绝对定位的按钮。

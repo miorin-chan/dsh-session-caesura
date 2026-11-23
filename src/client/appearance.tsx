@@ -1,6 +1,14 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 
 export const styles = `
+/* The turnTail slot's display: contents anchor puts its entries in the footer's flex column.
+   Move the note past the action row and use visual order for the footer's focus groups. */
+@supports (reading-flow: flex-visual) {
+  [data-slot="conversation.chat.node"] > :has(> [data-slot="conversation.chat.turnTail"]:not(:last-child) > .dsh-cn-note) {
+    reading-flow: flex-visual;
+    & > [data-slot="conversation.chat.turnTail"] > .dsh-cn-note { order: 1; }
+  }
+}
 .dsh-cn-note { display: flex; flex-direction: column; align-items: flex-end; margin-block: 8px; }
 .dsh-cn-bubble {
   box-sizing: border-box;
