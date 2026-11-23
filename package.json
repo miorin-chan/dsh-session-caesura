@@ -1,7 +1,6 @@
 {
   "name": "@miorin/dsh-session-caesura",
-  "version": "0.1.2",
-  "private": true,
+  "version": "0.1.0",
   "license": "MIT",
   "description": "Save a private closing note at the end of a conversation to record your progress or what you learned without continuing the conversation.",
   "type": "module",
@@ -69,5 +68,8 @@
     "esbuild": "0.28.2",
     "react": "18.3.1",
     "typescript": "5.7.3"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }
