@@ -5,6 +5,7 @@
 在插件目录执行 `npm ci`、`npm run build` 和 `npm run check`。
 检查涵盖行为、类型、产物与运行版本。
 在工作区根目录执行 `node tools/new-dsh-plugin/cli.mts --check plugins/dsh-session-caesura` 校验插件骨架。
+[宣传片](../assets/promo/README.md)的源文件、分镜和渲染方式放在 `assets/promo/`。
 
 ## 结语笔记的位置
 

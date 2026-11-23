@@ -7,3 +7,6 @@ node_modules/
 # Compiled tooling
 /scripts/build.mjs
 /scripts/sync-types.mjs
+
+# Rendered promo video (regenerate with assets/promo/render-video.sh)
+assets/promo/*.mp4

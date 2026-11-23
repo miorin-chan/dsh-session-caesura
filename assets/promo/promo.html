@@ -1,0 +1,657 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>休止符 宣传片</title>
+<meta name="viewport" content="width=960">
+<!--
+  Promo for dsh-session-caesura. Everything on screen is a pure function of time `t` (seconds):
+  - window.__T set (render-video.sh injects it per frame) → render that instant once;
+  - ?t=12 in the URL → render that instant;
+  - otherwise → play in a loop (Space pauses, ←/→ seeks 0.5 s).
+  Design size is 960×540 CSS px; render-html.sh renders at DSF 2 → 1920×1080.
+
+  The cue sheet below is shared: soundtrack.mts reads the same JSON to place music and UI sounds.
+  All times are absolute seconds on the film's clock; one bar is 2.5 s at 96 BPM.
+  Pairs are [start, end]. `rewind` replays the sent branch backwards, from `rewindFrom` to `rewindTo`.
+  `save1` and `save2` fall on beats: the music rests for one beat there.
+-->
+<script>window.__T = null; /*FRAME_T*/</script>
+<script id="timeline" type="application/json">
+{
+  "duration": 30.0,
+  "bpm": 96,
+  "winIn": [0.1, 0.7],
+  "captions": [[0.3, 3.95], [4.05, 6.5], [7.5, 9.9], [10.0, 14.9], [15.0, 19.4], [19.5, 24.3]],
+
+  "r1Reply": [0.35, 1.25],
+  "r1Actions": [1.25, 1.5],
+  "focus": 1.55,
+  "noteKeys": [1.7, 1.74, 1.81, 1.86, 1.91, 1.97, 2.03, 2.08, 2.14, 2.2, 2.26, 2.32, 2.38, 2.45, 2.5, 2.55, 2.61, 2.67, 2.72, 2.78, 2.83, 2.9, 2.96, 3.01, 3.07, 3.13, 3.2, 3.26, 3.31, 3.38, 3.45, 3.5],
+  "enterKeys": [3.8, 4.45],
+  "enter": 4.0,
+  "sent": [4.05, 4.4],
+  "r2Think": [4.45, 4.65],
+  "r2Done": 5.0,
+  "r2Reply": [5.05, 5.75],
+  "r2Actions": [5.75, 6.0],
+  "rewind": [6.6, 7.4],
+  "rewindFrom": 6.6,
+  "rewindTo": 3.75,
+
+  "compCam": [7.3, 8.0],
+  "modKeys": [7.8, 10.3],
+  "mod": [[8.05, 8.75], [9.1, 10.2]],
+  "cursor1": [9.15, 9.8],
+  "save1": 10.0,
+  "fly1": [10.05, 10.6],
+  "note1": [10.45, 10.95],
+  "noteCam": [10.1, 10.9],
+  "store": [11.3, 14.3],
+
+  "appendKeys": [15.25, 15.3, 15.36, 15.43, 15.5, 15.57, 15.62, 15.71, 15.76, 15.82, 15.89],
+  "saveKeys": [16.1, 17.4],
+  "mod2": [16.3, 17.1],
+  "save2": 16.875,
+  "fly2": [16.92, 17.4],
+  "append": 17.35,
+
+  "actsCam": [19.4, 20.2],
+  "cursor2": [20.0, 20.6],
+  "tipSend": [20.8, 21.3],
+  "cursor3": [21.35, 21.75],
+  "copy": 21.9,
+  "cursor4": [22.2, 22.6],
+  "rewindNote": 22.8,
+  "flyBack": [22.9, 23.45],
+  "noteOut": [22.95, 23.4],
+  "fill": 23.45,
+  "afterCam": [22.8, 23.5],
+
+  "winOut": [24.4, 25.0],
+  "end": 25.0
+}
+</script>
+<style>
+:root {
+  /* system-ui → SF for Latin even in a zh-CN page (-apple-system resolves to PingFang here). */
+  --sans: system-ui, "PingFang SC", "Helvetica Neue", sans-serif;
+  /* "SF Mono" / ui-monospace are not reachable headless and fall back to PingFang (long dashes). */
+  --mono: Menlo, Monaco, monospace;
+  /* End card: Songti for the Chinese name, Bodoni italic for the Latin one, like an expression mark in a score. */
+  --serif-zh: "Songti SC", "STSong", serif;
+  --serif-en: "Bodoni 72", "Didot", serif;
+  --accent: #6575de;
+
+  /* DSH light theme tokens (design-platform.css, 0.2.2) */
+  --bg: #ffffff; --tb: #f9fafb; --tb-line: rgba(0, 0, 0, .07); --layer1: #ffffff;
+  --l1: rgb(15, 17, 21); --l2: rgb(97, 102, 107); --l3: rgb(129, 133, 140); --cap: rgb(173, 178, 184);
+  --b1: rgba(0, 0, 0, .06); --b2: rgba(0, 0, 0, .10); --b4: rgba(0, 0, 0, .14);
+  --brand: rgb(65, 118, 230); --bubble: rgb(237, 243, 254); --input: #ffffff;
+  --hover: rgba(38, 49, 72, .06); --selector: rgb(245, 246, 247); --code-bg: rgba(38, 49, 72, .06);
+  --send: rgb(65, 118, 230); --send-off: rgb(222, 225, 230); --ring: rgba(0, 0, 0, .07); --shadow-a: rgba(15, 23, 42, .14);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 960px; height: 540px; overflow: hidden; background: #f3f4f8; }
+body { font-family: var(--sans); color: #15181d; -webkit-font-smoothing: antialiased; }
+svg { display: block; }
+
+#scene {
+  position: relative; width: 960px; height: 540px; overflow: hidden;
+  background:
+    radial-gradient(560px 380px at 6% 0%, rgba(101, 117, 222, .10), transparent 70%),
+    radial-gradient(560px 400px at 96% 100%, rgba(120, 160, 235, .10), transparent 70%),
+    #f3f4f8;
+}
+
+/* Captions: one line per beat of the story, above the window */
+.cap { position: absolute; left: 50%; top: 16px; transform: translateX(-50%); display: flex; align-items: center; gap: 12px; white-space: nowrap; opacity: 0; }
+.cap-num { flex: none; padding: 4px 6px; border-radius: 6px; background: var(--accent); color: #fff; font: 600 11px/1 var(--mono); letter-spacing: .5px; }
+.cap-main { display: flex; align-items: center; gap: 2px; font-size: 17px; font-weight: 600; line-height: 24px; letter-spacing: .2px; color: #15181d; }
+.cap-main.solo, .cap-sub.solo { justify-content: center; }
+.cap-sub { display: flex; align-items: center; gap: 4px; margin-top: 2px; font-size: 12.5px; line-height: 18px; color: #5d636b; }
+.cap svg { display: inline-block; flex: none; }
+#rwChip { position: absolute; left: 50%; top: 26px; display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 14px 0 11px; border-radius: 15px; background: rgba(20, 23, 28, .86); color: #fff; font-size: 13px; letter-spacing: 1px; opacity: 0; }
+
+/* App window */
+#win {
+  position: absolute; left: 90px; top: 72px; width: 780px; height: 456px;
+  border-radius: 12px; overflow: hidden; background: var(--bg); color: var(--l1);
+  box-shadow: 0 0 0 .5px rgba(17, 24, 39, .12), 0 26px 60px -18px rgba(30, 41, 80, .30), 0 6px 16px -8px rgba(30, 41, 80, .14);
+}
+.tb { position: relative; height: 32px; display: flex; align-items: center; gap: 8px; padding-left: 13px; background: var(--tb); border-bottom: .5px solid var(--tb-line); }
+.tb i { width: 11px; height: 11px; border-radius: 50%; }
+.tb span { position: absolute; left: 0; right: 0; text-align: center; font-size: 12px; color: var(--l3); }
+#vp { position: absolute; left: 0; top: 32px; width: 780px; height: 424px; overflow: hidden; }
+#cam { position: absolute; left: 0; top: 0; width: 780px; height: 424px; transform-origin: 0 0; }
+#chat { position: absolute; left: 0; top: 0; width: 780px; overflow: hidden; }
+#col { position: absolute; left: 110px; width: 560px; }
+#tape { position: absolute; inset: 32px 0 0; pointer-events: none; opacity: 0; background: repeating-linear-gradient(0deg, rgba(40, 48, 80, .10) 0 1px, transparent 1px 7px); }
+
+/* Flow items: .w animates presence, .in carries the gap above */
+.w { overflow: hidden; }
+.u { display: flex; justify-content: flex-end; }
+.u > div { max-width: 70%; padding: 9px 14px; border-radius: 16px; background: var(--bubble); color: var(--l1); font-size: 14px; line-height: 22px; white-space: pre-wrap; }
+.reply { font-size: 14px; line-height: 24px; color: var(--l1); white-space: pre-wrap; }
+.reply code { font-family: var(--mono); font-size: 12.5px; padding: 1px 5px; border-radius: 5px; background: var(--code-bg); }
+.phead { display: flex; align-items: center; height: 33px; padding-bottom: 8px; border-bottom: .5px solid var(--b2); color: var(--l3); font-size: 14px; line-height: 24px; white-space: nowrap; }
+.phead svg { margin-left: 4px; }
+.phead .mono { margin-left: .3em; font-family: var(--mono); font-size: .92em; }
+.shimmer { -webkit-background-clip: text; background-clip: text; color: transparent; background-size: 300% 100%; }
+.acts { display: flex; align-items: center; gap: 8px; height: 28px; margin-left: -6px; color: var(--l3); }
+.acts i { display: grid; place-items: center; width: 28px; height: 28px; }
+.acts span { margin-left: 4px; font-size: 12px; }
+
+/* Closing note (mirrors src/client/appearance.tsx .dsh-cn-*) */
+.cn-note { display: flex; flex-direction: column; align-items: flex-end; padding-bottom: 8px; }
+.cn-title { display: flex; align-items: center; gap: 4px; margin-bottom: 3px; color: var(--l2); font-size: 13px; line-height: 20px; }
+.cn-bubble { max-width: 82%; padding: 10px 16px; border-radius: 16px; background: var(--bubble); color: var(--l1); font-size: 14px; line-height: 22px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.cn-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 2px; }
+.cn-btn { position: relative; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; color: var(--l3); }
+.cn-btn svg { position: absolute; }
+.fill { border-radius: 3px; }
+
+/* Composer (DSH InputBar card; primary action 34×34 at right 8 / bottom 8) */
+#composer { position: absolute; left: 110px; bottom: 14px; width: 560px; border-radius: 28px; background: var(--input); box-shadow: 0 0 0 .5px var(--ring), 0 8px 24px -10px var(--shadow-a); }
+#draft { position: relative; min-height: 36px; padding: 12px 18px 2px; font-size: 14px; line-height: 22px; color: var(--l1); white-space: pre-wrap; }
+.ph { color: var(--cap); }
+.caret { display: inline-block; width: 1.5px; height: 17px; margin: 0 1px; vertical-align: -3px; background: var(--l1); }
+.cmp-row { display: flex; align-items: center; justify-content: space-between; height: 50px; padding: 0 8px 0 10px; }
+.add-btn { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--selector); color: var(--l2); }
+#send { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; }
+/* The rest overlays the send action (.dsh-cn-button.dsh-cn-save) */
+#rest { position: absolute; right: 8px; bottom: 8px; display: grid; place-items: center; width: 34px; height: 34px; border: 1px solid var(--b4); border-radius: 50%; background: var(--input); color: var(--l2); opacity: 0; }
+
+/* Overlays inside the camera layer */
+.callout { position: absolute; left: 0; top: 0; padding: 4px 9px; border-radius: 6px; background: rgba(20, 23, 28, .92); color: #fff; font-size: 11px; line-height: 16px; white-space: nowrap; opacity: 0; }
+.callout::before { content: ""; position: absolute; width: 8px; height: 8px; background: inherit; transform: rotate(45deg); }
+.callout.right::before { right: -3px; top: calc(50% - 4px); }
+#tip { position: absolute; left: 0; top: 0; padding: 3px 7px; border: .5px solid rgba(0, 0, 0, .18); border-radius: 5px; background: #f6f6f6; color: #222; font-size: 11px; line-height: 15px; white-space: nowrap; box-shadow: 0 3px 10px rgba(0, 0, 0, .14); opacity: 0; }
+#keys { position: absolute; left: 0; top: 0; display: flex; align-items: center; gap: 6px; opacity: 0; }
+.kbd { display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 9px; border: .5px solid rgba(0, 0, 0, .16); border-radius: 7px; background: #fff; color: #2b2f36; font-size: 12px; font-weight: 500; box-shadow: 0 2px 0 rgba(0, 0, 0, .14), 0 8px 16px -8px rgba(0, 0, 0, .25); }
+.kplus { color: #8a9099; font-size: 12px; }
+#ghost { position: absolute; left: 0; top: 0; max-width: 300px; overflow: hidden; padding: 6px 12px; border-radius: 12px; background: var(--bubble); color: var(--l1); font-size: 13px; line-height: 20px; white-space: nowrap; text-overflow: ellipsis; box-shadow: 0 8px 22px -6px rgba(101, 117, 222, .40); opacity: 0; }
+.ripple { position: absolute; left: 0; top: 0; width: 44px; height: 44px; margin: -22px 0 0 -22px; border-radius: 50%; background: rgba(101, 117, 222, .28); opacity: 0; }
+#cursor { position: absolute; left: 0; top: 0; width: 20px; height: 24px; opacity: 0; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, .25)); transform-origin: 2px 1.5px; }
+
+/* End card */
+#end { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+#end > * { opacity: 0; }
+.e-rest { width: 66px; height: 158px; }
+.e-name { display: flex; align-items: baseline; gap: 18px; margin-top: 34px; color: #23262d; }
+.e-name .zh { font-family: var(--serif-zh); font-weight: 300; font-size: 40px; letter-spacing: 8px; margin-right: -8px; }
+.e-name .dot { align-self: center; width: 5px; height: 5px; margin-top: 6px; border-radius: 50%; background: #a4aab4; }
+.e-name .en { font-family: var(--serif-en); font-style: italic; font-size: 44px; letter-spacing: .5px; }
+.e-pkg { margin-top: 30px; font: 12.5px/1.4 var(--mono); color: #9aa0ab; letter-spacing: .3px; }
+</style>
+</head>
+<body>
+<div id="scene">
+  <div id="captions"></div>
+  <div id="rwChip"><svg width="16" height="12" viewBox="0 0 16 12"><path d="M7.5 1 1 6l6.5 5ZM15 1 8.5 6l6.5 5Z" fill="#fff"/></svg>倒回发送之前</div>
+
+  <div id="win">
+    <div class="tb"><i style="background:#ff5f57"></i><i style="background:#febc2e"></i><i style="background:#28c840"></i><span>token 刷新流程</span></div>
+    <div id="vp">
+      <div id="cam">
+        <div id="chat"><div id="col">
+
+          <div class="w" id="u1"><div class="in"><div class="u"><div>讲讲这个项目的 token 是怎么刷新的</div></div></div></div>
+
+          <div class="w" id="p1"><div class="in" style="padding-top:16px">
+            <div class="phead"><span>已完成，用时</span><span class="mono">21s</span><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          </div></div>
+
+          <div class="w" id="a1"><div class="in" style="padding-top:12px"><div class="reply"></div></div></div>
+
+          <div class="w" id="x1"><div class="in" style="padding-top:16px"><div class="acts"><i data-icon="copyAct"></i><i data-icon="retry"></i><span>14:32</span></div></div></div>
+
+          <div class="w" id="nt"><div class="in" style="padding-top:8px">
+            <section class="cn-note">
+              <div class="cn-title" id="ntTitle"><span data-glyph="rest" data-size="15"></span>结语笔记</div>
+              <div class="cn-bubble" id="bubble"></div>
+              <div class="cn-actions">
+                <span class="cn-btn" id="bCopy"><span data-glyph="copy"></span><span data-glyph="check"></span></span>
+                <span class="cn-btn" id="bRewind"><span data-glyph="rewind"></span></span>
+                <span class="cn-btn" id="bSend"><span data-glyph="send"></span></span>
+              </div>
+            </section>
+          </div></div>
+
+          <div class="w" id="u2"><div class="in" style="padding-top:28px"><div class="u"><div id="u2text"></div></div></div></div>
+
+          <div class="w" id="p2"><div class="in" style="padding-top:16px">
+            <div class="phead"><span class="state"></span><span class="mono took">3s</span><svg class="chev" width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          </div></div>
+
+          <div class="w" id="a2"><div class="in" style="padding-top:12px"><div class="reply"></div></div></div>
+
+          <div class="w" id="x2"><div class="in" style="padding-top:16px"><div class="acts"><i data-icon="copyAct"></i><i data-icon="retry"></i><span>14:33</span></div></div></div>
+
+        </div></div>
+
+        <div id="composer">
+          <div id="draft"></div>
+          <div class="cmp-row">
+            <span class="add-btn"><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span>
+            <span id="send"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 11.5V2.8M3 6.6 7 2.6l4 4" stroke="#fff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+          </div>
+          <span id="rest"><span data-glyph="rest" data-size="24"></span></span>
+        </div>
+
+        <div class="callout right" id="callStore">只存在当前浏览器</div>
+        <div id="tip"></div>
+        <div id="keys"><span class="kbd" id="kMod">⌘ Command</span><span class="kplus" id="kPlus">+</span><span class="kbd" id="kEnter">Enter ↵</span></div>
+        <div id="ghost"></div>
+        <div class="ripple" id="ripple"></div>
+        <svg id="cursor" viewBox="0 0 20 24"><path d="M2 1.5v18.3l4.6-4.5 3.1 6.9 3.2-1.4-3.1-6.8h6.5Z" fill="#111" stroke="#fff" stroke-width="1.4" stroke-linejoin="round"/></svg>
+      </div>
+    </div>
+    <div id="tape"></div>
+  </div>
+
+  <div id="end">
+    <svg class="e-rest" viewBox="7.4 1 9.2 22" aria-hidden="true">
+      <defs><linearGradient id="restFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8190ec"/><stop offset="1" stop-color="#5463d2"/></linearGradient>
+        <linearGradient id="inkFade" gradientUnits="userSpaceOnUse" x1="0" x2="0" y1="0" y2="3"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#000"/></linearGradient>
+        <mask id="ink" maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24"><rect x="0" y="0" width="24" height="24" fill="url(#inkFade)"/></mask></defs>
+      <path id="endRest" fill="url(#restFill)" mask="url(#ink)" d=""/>
+    </svg>
+    <div class="e-name"><span class="zh">休止符</span><span class="dot"></span><span class="en" lang="en">Caesura</span></div>
+    <div class="e-pkg">@miorin/dsh-session-caesura</div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const C = JSON.parse($('timeline').textContent);
+  const DURATION = C.duration;
+  const VW = 780, VH = 424;
+
+  const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+  const seg = (t, a, b) => clamp((t - a) / (b - a));
+  const lerp = (a, b, p) => a + (b - a) * p;
+  const out3 = (p) => 1 - Math.pow(1 - p, 3);
+  const inOut3 = (p) => (p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2);
+  const bell = (p) => Math.sin(Math.PI * clamp(p));
+  const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+  const within = (t, [a, b]) => t >= a && t < b;
+
+  // ---------------------------------------------------------------- icons
+  // Bravura SMuFL restQuarter (U+E4E5), as in src/client/appearance.tsx. License: docs/bravura-OFL.txt.
+  const REST_D = 'M10.39 13.04 C10.83 13.6 11.23 14.13 11.59 14.72 C11.65 14.84 11.76 15.06 11.76 15.12 C11.76 15.14 11.76 15.2 11.73 15.23 C11.68 15.34 11.56 15.37 11.42 15.37 C11.31 15.37 11.09 15.31 10.98 15.28 C10.83 15.28 10.67 15.2 10.53 15.2 C9.32 15.2 8.22 16.41 8.22 17.9 C8.22 19.3 9.43 20.68 11.48 22.25 C11.71 22.42 11.99 22.5 12.21 22.5 C12.41 22.5 12.6 22.44 12.63 22.33 C12.66 22.25 12.69 22.19 12.69 22.14 C12.69 21.88 12.46 21.66 12.24 21.46 C11.87 21.46 11.56 20.7 11.51 20.45 C11.42 20.23 11.4 19.97 11.4 19.72 C11.4 18.85 11.82 17.87 12.72 17.7 C12.86 17.67 13 17.67 13.17 17.67 C13.98 17.67 14.91 17.98 15.35 18.15 C15.38 18.15 15.41 18.18 15.44 18.18 C15.52 18.2 15.58 18.2 15.64 18.2 C15.72 18.2 15.78 18.18 15.78 18.09 C15.78 17.76 15.05 16.83 14.74 16.49 C13.67 15.2 12.8 14.16 12.8 12.59 C12.8 12.48 12.83 12.34 12.83 12.22 C12.94 10.6 13.95 9.25 14.68 8.1 C14.77 7.96 14.79 7.82 14.79 7.68 C14.79 7.4 14.68 7.14 14.68 7.14 C14.68 7.14 10.53 2.2 10.05 1.72 C9.91 1.58 9.71 1.5 9.54 1.5 C9.26 1.5 8.98 1.7 8.98 2.09 C8.98 2.23 9.01 2.37 9.09 2.54 C9.21 2.85 10.81 4.28 10.81 6.3 C10.81 7.34 10.39 8.55 9.12 9.87 C8.84 10.15 8.73 10.46 8.73 10.68 C8.73 11.07 9.01 11.35 9.01 11.35 Z';
+  // Shapes from src/client/appearance.tsx `artwork` (24×24, stroke 1.65).
+  const GLYPHS = {
+    rest: `<path fill="currentColor" stroke="none" d="${REST_D}"/>`,
+    copy: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>',
+    check: '<path d="m5 12 4 4L19 6"/>',
+    rewind: '<path d="M4 10h11a5 5 0 0 1 0 10h-3"/><path d="m9 5-5 5 5 5"/>',
+    send: '<path d="m3 10 18-7-7 18-3.4-7.6L3 10Z"/><path d="m10.6 13.4 5-5"/>',
+  };
+  const glyph = (name, size = 17) => `<svg aria-hidden="true" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round">${GLYPHS[name]}</svg>`;
+  // DSH message action row icons.
+  const ICONS = {
+    copyAct: '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"><rect x="5.25" y="5.25" width="8.5" height="8.5" rx="2"/><path d="M3 10.5V4A1.75 1.75 0 0 1 4.75 2.25h5.75" stroke-linecap="round"/></svg>',
+    retry: '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M13.2 8.6A5.25 5.25 0 1 1 11.5 4"/><path d="M12 1.8v2.7H9.3"/></svg>',
+  };
+  for (const el of document.querySelectorAll('[data-glyph]')) el.outerHTML = glyph(el.dataset.glyph, Number(el.dataset.size || 17));
+  for (const el of document.querySelectorAll('[data-icon]')) el.innerHTML = ICONS[el.dataset.icon];
+  $('endRest').setAttribute('d', REST_D);
+
+  // ---------------------------------------------------------------- script
+  const NOTE1 = '续期在 auth/refresh.ts：过期前 5 分钟静默刷新';
+  const NOTE2 = '下次：给续期失败补重试';
+  const MERGED = `${NOTE1}\n\n${NOTE2}`;
+  const REPLY1 = [
+    ['令牌刷新集中在 ', false], ['auth/refresh.ts', true], ['：\n', false],
+    ['1. 请求拦截器在 access token 过期前 5 分钟静默续期；\n2. 并发请求共用同一个续期 Promise，不会重复刷新；\n3. 续期失败时清空会话，跳回登录页。', false],
+  ];
+  const REPLY2 = [['好的，记下了。需要我顺便给续期失败加上重试吗？', false]];
+  const rest = (size, color = 'var(--accent)') => glyph('rest', size).replace('<svg ', `<svg style="color:${color}" `);
+  const CAPTIONS = [
+    [null, '一轮结束，想把收获记下来', '刚弄懂的流程，或者做到了哪一步'],
+    [null, '可一发出去，又开了一轮', '模型还会接话，上下文也多了一段'],
+    ['01', `按住 ⌘，发送键变成休止符${rest(22)}`, '松开即恢复 · Windows / Linux 上是 Ctrl'],
+    ['02', '点一下：存为结语笔记', '不发给模型，也不开新一轮'],
+    ['03', '再存一次，接在后面', '⌘ Enter 同样保存 · 两段之间空一行'],
+    ['04', '复制、回退，或者发送', '回退：移回输入框接着改 · 发送：作为普通消息发出'],
+  ];
+  const capRoot = $('captions');
+  const caps = CAPTIONS.map(([num, main, sub]) => {
+    const el = document.createElement('div');
+    el.className = 'cap';
+    const solo = num === null ? ' solo' : '';
+    el.innerHTML = `${num ? `<span class="cap-num">${num}</span>` : ''}<div><div class="cap-main${solo}">${main}</div><div class="cap-sub${solo}">${sub}</div></div>`;
+    capRoot.appendChild(el);
+    return el;
+  });
+
+  // ---------------------------------------------------------------- nodes
+  const cam = $('cam'), chat = $('chat'), col = $('col');
+  const W = Object.fromEntries(['u1', 'p1', 'a1', 'x1', 'nt', 'u2', 'p2', 'a2', 'x2'].map((id) => [id, $(id)]));
+  const IN = (id) => W[id].firstElementChild;
+  const composer = $('composer'), draft = $('draft'), send = $('send'), restBtn = $('rest');
+  const bubble = $('bubble'), ntTitle = $('ntTitle'), bCopy = $('bCopy'), bRewind = $('bRewind'), bSend = $('bSend');
+  const callStore = $('callStore'), tip = $('tip'), keys = $('keys'), kMod = $('kMod'), kPlus = $('kPlus'), kEnter = $('kEnter');
+  const ghost = $('ghost'), ripple = $('ripple'), cursor = $('cursor'), rwChip = $('rwChip'), tape = $('tape');
+  const winEl = $('win'), endEl = $('end');
+  const [copyIco, checkIco] = bCopy.querySelectorAll('svg');
+  $('u2text').textContent = NOTE1;
+
+  /** Box of `el` in #cam's own (unscaled) coordinates; call while #cam has no transform. */
+  function box(el) {
+    const c = cam.getBoundingClientRect(), r = el.getBoundingClientRect(), k = c.width / VW;
+    const x = (r.left - c.left) / k, y = (r.top - c.top) / k, w = r.width / k, h = r.height / k;
+    return { x, y, w, h, cx: x + w / 2, cy: y + h / 2, r: x + w, b: y + h };
+  }
+
+  /** Presence of a flow item: 0 → collapsed, 1 → natural height. */
+  function present(w, p, fade = true) {
+    if (p <= 0) { w.style.height = '0px'; w.style.opacity = '0'; w.style.overflow = 'hidden'; return; }
+    if (p >= 1) { w.style.height = ''; w.style.opacity = '1'; w.style.overflow = 'visible'; return; }
+    w.style.overflow = 'hidden';
+    w.style.height = `${(w.firstElementChild.offsetHeight * p).toFixed(2)}px`;
+    w.style.opacity = fade ? clamp(p * 1.6).toFixed(3) : '1';
+  }
+
+  function streamHTML(parts, n) {
+    let html = '';
+    for (const [text, code] of parts) {
+      if (n <= 0) break;
+      const part = esc(text.slice(0, n));
+      html += code ? `<code>${part}</code>` : part;
+      n -= text.length;
+    }
+    return html;
+  }
+  const lengthOf = (parts) => parts.reduce((n, [s]) => n + s.length, 0);
+  const typed = (t, times, text) => [...text].slice(0, times.filter((x) => t >= x).length).join('');
+  const hlAt = (t, at) => 0.16 * (1 - seg(t, at + 0.25, at + 1.0));
+
+  /** Branch clock: the sent turn plays forward, then rewinds to just before Enter and stays there. */
+  function branchT(t) {
+    const [a, b] = C.rewind;
+    if (t < a) return t;
+    if (t < b) return lerp(C.rewindFrom, C.rewindTo, inOut3(seg(t, a, b)));
+    return C.rewindTo;
+  }
+
+  // ---------------------------------------------------------------- composer draft
+  function draftModel(t) {
+    if (t < C.rewind[1]) {
+      const b = branchT(t);
+      return b < C.enter ? [{ s: typed(b, C.noteKeys, NOTE1) }] : [];
+    }
+    if (t < C.save1) return [{ s: NOTE1 }];
+    if (t < C.save2) return [{ s: typed(t, C.appendKeys, NOTE2) }];
+    if (t < C.fill) return [];
+    return [{ s: MERGED, hl: hlAt(t, C.fill) }];
+  }
+  const allKeys = [...C.noteKeys, C.enter, ...C.appendKeys, C.save2];
+
+  function renderDraft(t) {
+    const segs = draftModel(t).filter((s) => s.s);
+    const focused = t >= C.focus;
+    const typing = allKeys.some((x) => t >= x - 0.02 && t < x + 0.45);
+    const caretOn = focused && (typing || ((t - C.focus) % 1.0) < 0.55);
+    const caret = focused ? `<span class="caret" style="opacity:${caretOn ? 1 : 0}"></span>` : '';
+    if (segs.length === 0) {
+      draft.innerHTML = `${caret}<span class="ph">发消息或创建任务, / 调用指令, @ 文件或对话</span>`;
+    } else {
+      draft.innerHTML = segs.map((s) => (s.hl
+        ? `<span class="fill" style="background:rgba(101,117,222,${s.hl.toFixed(3)})">${esc(s.s)}</span>`
+        : esc(s.s))).join('') + caret;
+    }
+    return segs.length > 0;
+  }
+
+  // ---------------------------------------------------------------- camera and pointer
+  const MAX_ZOOM = VW / 604;
+  function frame(top, bottom, maxS) {
+    return { s: clamp(VH / Math.max(1, bottom - top), 1, Math.min(maxS, MAX_ZOOM)), x: VW / 2, y: (top + bottom) / 2 };
+  }
+  const SHOTS = {
+    wide: () => ({ s: 1, x: VW / 2, y: VH / 2 }),
+    comp: (B) => frame(B.comp.y - 210, B.comp.b + 8, 1.4),
+    note: (B) => frame(B.nt.y - 16, B.comp.b + 8, 1.3),
+    acts: (B) => frame(B.nt.y - 28, B.nt.b + 34, 1.3),
+    after: (B) => frame(B.x1.y - 24, B.comp.b + 8, 1.2),
+  };
+  const CAMERA = [[null, 'wide'], [C.compCam, 'comp'], [C.noteCam, 'note'], [C.actsCam, 'acts'], [C.afterCam, 'after']];
+  const mixShot = (a, b, p) => ({ s: lerp(a.s, b.s, p), x: lerp(a.x, b.x, p), y: lerp(a.y, b.y, p) });
+
+  const near = (b, dx = 4, dy = 5) => ({ x: b.cx + dx, y: b.cy + dy });
+  const MOVES = [
+    { at: C.cursor1, from: (B) => ({ x: B.rest.cx - 170, y: B.rest.cy - 100 }), to: (B) => near(B.rest, 2, 3), arc: 22 },
+    { at: C.cursor2, from: (B) => ({ x: B.bSend.cx + 70, y: B.bSend.cy + 120 }), to: (B) => near(B.bSend, 3, 4), arc: 16 },
+    { at: C.cursor3, to: (B) => near(B.bCopy, 3, 4), arc: 10 },
+    { at: C.cursor4, to: (B) => near(B.bRewind, 3, 4), arc: 10 },
+  ];
+  const VISIBLE = [[C.cursor1[0] - 0.05, 10.7], [C.cursor2[0] - 0.05, C.rewindNote + 0.3]];
+  const CLICKS = [C.save1, C.copy, C.rewindNote];
+
+  function pointer(t, B) {
+    let pos = MOVES[0].from(B);
+    for (const m of MOVES) {
+      if (t < m.at[0]) break;
+      const from = m.from ? m.from(B) : pos, to = m.to(B), p = inOut3(seg(t, ...m.at));
+      pos = { x: lerp(from.x, to.x, p), y: lerp(from.y, to.y, p) - bell(p) * m.arc };
+    }
+    const op = Math.max(...VISIBLE.map(([a, b]) => seg(t, a, a + 0.12) * (1 - seg(t, b, b + 0.12))));
+    return { ...pos, op };
+  }
+
+  const modHeld = (t) => [...C.mod, C.mod2].some((r) => within(t, r));
+
+  // ---------------------------------------------------------------- frame
+  function renderScene(t) {
+    cam.style.transform = 'none';
+    const tb = branchT(t);
+
+    // 1. Window in / out, and the tape look while rewinding.
+    const wIn = out3(seg(t, ...C.winIn)), wOut = inOut3(seg(t, ...C.winOut));
+    const rw = bell(seg(t, ...C.rewind));
+    winEl.style.opacity = (wIn * (1 - wOut)).toFixed(3);
+    winEl.style.transform = `scale(${(lerp(0.985, 1, wIn) * (1 - 0.03 * wOut)).toFixed(4)})`;
+    const filters = [];
+    if (wOut > 0) filters.push(`blur(${(wOut * 6).toFixed(2)}px)`);
+    if (rw > 0) filters.push(`saturate(${(1 - 0.6 * rw).toFixed(3)})`, `contrast(${(1 - 0.08 * rw).toFixed(3)})`);
+    winEl.style.filter = filters.length ? filters.join(' ') : 'none';
+    tape.style.opacity = (0.9 * rw).toFixed(3);
+    tape.style.backgroundPosition = `0 ${(-t * 160 % 7).toFixed(2)}px`;
+    rwChip.style.opacity = (seg(t, C.rewind[0], C.rewind[0] + 0.15) * (1 - seg(t, C.rewind[1] - 0.15, C.rewind[1]))).toFixed(3);
+    rwChip.style.transform = `translateX(-50%) translateX(${(-3 * Math.sin(t * 40) * rw).toFixed(2)}px)`;
+
+    // 2. The finished turn.
+    present(W.u1, 1);
+    present(W.p1, 1);
+    const r1 = seg(t, ...C.r1Reply);
+    IN('a1').firstElementChild.innerHTML = streamHTML(REPLY1, Math.round(lengthOf(REPLY1) * r1));
+    present(W.a1, t >= C.r1Reply[0] ? 1 : 0);
+    present(W.x1, out3(seg(t, ...C.r1Actions)));
+
+    // 3. The sent branch, on the branch clock.
+    present(W.u2, out3(seg(tb, ...C.sent)));
+    const thinking = tb < C.r2Done;
+    const p2 = IN('p2'), state = p2.querySelector('.state');
+    state.textContent = thinking ? '思考中' : '已完成，用时';
+    state.className = thinking ? 'state shimmer' : 'state';
+    state.style.backgroundImage = thinking ? 'linear-gradient(90deg, var(--l3) 0%, var(--l3) 35%, var(--cap) 50%, var(--l3) 65%, var(--l3) 100%)' : '';
+    state.style.backgroundPosition = `${(100 - ((tb * 110) % 100) * 1.5).toFixed(1)}% 0`;
+    p2.querySelector('.took').style.display = thinking ? 'none' : '';
+    p2.querySelector('.chev').style.display = thinking ? 'none' : '';
+    present(W.p2, out3(seg(tb, ...C.r2Think)));
+    IN('a2').firstElementChild.innerHTML = streamHTML(REPLY2, Math.round(lengthOf(REPLY2) * seg(tb, ...C.r2Reply)));
+    present(W.a2, tb >= C.r2Reply[0] ? 1 : 0);
+    present(W.x2, out3(seg(tb, ...C.r2Actions)));
+
+    // 4. Closing note: saved, appended, rewound into the composer.
+    const appended = t >= C.append;
+    const hl = hlAt(t, C.append);
+    bubble.innerHTML = appended
+      ? `${esc(NOTE1)}\n\n<span class="fill" style="background:rgba(101,117,222,${hl.toFixed(3)})">${esc(NOTE2)}</span>`
+      : esc(NOTE1);
+    present(W.nt, out3(seg(t, ...C.note1)) * (1 - inOut3(seg(t, ...C.noteOut))));
+    const copied = within(t, [C.copy, C.copy + 1.2]);
+    copyIco.style.opacity = copied ? '0' : '1';
+    checkIco.style.opacity = copied ? '1' : '0';
+
+    // 5. Composer and chat column (short chats start at the top, long ones stick to the bottom).
+    const hasText = renderDraft(t);
+    for (const b of [bRewind, bSend]) b.style.opacity = hasText ? '0.45' : '1';
+    const compH = composer.offsetHeight;
+    const chatH = VH - 14 - compH - 8;
+    chat.style.height = `${chatH}px`;
+    col.style.top = `${Math.min(18, chatH - col.offsetHeight - 6).toFixed(2)}px`;
+
+    // 6. Send arrow and the rest overlay.
+    const showRest = t >= C.rewind[1] && hasText && modHeld(t);
+    restBtn.style.opacity = showRest ? '1' : '0';
+    send.style.background = hasText ? 'var(--send)' : 'var(--send-off)';
+    send.style.transform = `scale(${(1 - 0.1 * bell(seg(tb, C.enter, C.enter + 0.14))).toFixed(3)})`;
+    restBtn.style.transform = `scale(${(1 - 0.1 * bell(seg(t, C.save1, C.save1 + 0.14))).toFixed(3)})`;
+
+    // 7. Measure.
+    const B = {
+      comp: box(composer), draft: box(draft), rest: box(restBtn), nt: box(IN('nt')), x1: box(W.x1),
+      bubble: box(bubble), title: box(ntTitle), bCopy: box(bCopy), bRewind: box(bRewind), bSend: box(bSend),
+    };
+
+    // 8. Pointer, clicks, hover.
+    const P = pointer(t, B);
+    const press = Math.max(...CLICKS.map((c) => bell(seg(t, c, c + 0.14))));
+    cursor.style.opacity = P.op.toFixed(3);
+    cursor.style.transform = `translate(${(P.x - 2).toFixed(2)}px, ${(P.y - 1.5).toFixed(2)}px) scale(${(1 - 0.12 * press).toFixed(3)})`;
+    const lastClick = CLICKS.filter((c) => t >= c).pop();
+    const rp = lastClick === undefined ? 1 : seg(t, lastClick, lastClick + 0.5);
+    ripple.style.opacity = rp > 0 && rp < 1 ? (0.9 * (1 - rp)).toFixed(3) : '0';
+    if (rp < 1) ripple.style.transform = `translate(${P.x.toFixed(2)}px, ${P.y.toFixed(2)}px) scale(${(0.2 + 0.8 * out3(rp)).toFixed(3)})`;
+    const over = (b) => P.op > 0.5 && P.x >= b.x && P.x <= b.r && P.y >= b.y && P.y <= b.b;
+    for (const [el, b] of [[bCopy, B.bCopy], [bRewind, B.bRewind], [bSend, B.bSend]]) {
+      el.style.background = over(b) ? 'var(--hover)' : 'transparent';
+      el.style.color = over(b) ? 'var(--l1)' : '';
+    }
+    restBtn.style.color = over(B.rest) ? 'var(--l1)' : '';
+
+    // 9. Callout and the native tooltip.
+    const sp = out3(seg(t, C.store[0], C.store[0] + 0.3)) * (1 - seg(t, C.store[1] - 0.3, C.store[1]));
+    callStore.style.opacity = sp.toFixed(3);
+    callStore.style.transform = `translate(${(B.title.x - callStore.offsetWidth - 10 - (1 - sp) * 4).toFixed(2)}px, ${(B.title.cy - callStore.offsetHeight / 2).toFixed(2)}px)`;
+    tip.textContent = '发送';
+    tip.style.opacity = within(t, C.tipSend) ? '1' : '0';
+    tip.style.transform = `translate(${(P.x - tip.offsetWidth / 2).toFixed(2)}px, ${(P.y + 22).toFixed(2)}px)`;
+
+    // 10. Keycaps: Enter (the sent branch), ⌘ (rest), ⌘ + Enter (append).
+    let kp = 0, set = '';
+    const showKeys = (r, which, clock = t) => {
+      const p = out3(seg(clock, r[0], r[0] + 0.2)) * (1 - seg(clock, r[1] - 0.2, r[1]));
+      if (p > kp) { kp = p; set = which; }
+    };
+    if (t < C.rewind[1]) showKeys(C.enterKeys, 'enter', tb);
+    showKeys(C.modKeys, 'mod');
+    showKeys(C.saveKeys, 'both');
+    keys.style.opacity = kp.toFixed(3);
+    kMod.style.display = set === 'enter' ? 'none' : '';
+    kPlus.style.display = set === 'both' ? '' : 'none';
+    kEnter.style.display = set === 'mod' ? 'none' : '';
+    keys.style.transform = `translate(${(B.comp.r - 8 - 34 - 12 - keys.offsetWidth).toFixed(2)}px, ${(B.comp.b - 25 - keys.offsetHeight / 2 + (1 - kp) * 4).toFixed(2)}px)`;
+    const down = (el, on) => {
+      el.style.transform = on ? 'translateY(1.5px)' : 'none';
+      el.style.boxShadow = on ? '0 .5px 0 rgba(0,0,0,.14)' : '';
+      el.style.background = on ? '#eef0fc' : '#fff';
+    };
+    down(kMod, modHeld(t));
+    down(kEnter, within(t < C.rewind[1] ? tb : -1, [C.enter, C.enter + 0.14]) || within(t, [C.save2, C.save2 + 0.14]));
+
+    // 11. Flights: draft → note, note → draft.
+    ghost.style.opacity = '0';
+    for (const f of [
+      { at: C.fly1, text: NOTE1, from: B.draft, to: B.bubble },
+      { at: C.fly2, text: NOTE2, from: B.draft, to: B.bubble },
+      { at: C.flyBack, text: MERGED.replace(/\n+/g, ' '), from: B.bubble, to: B.draft },
+    ]) {
+      const gp = seg(t, ...f.at);
+      if (gp <= 0 || gp >= 1) continue;
+      ghost.textContent = f.text;
+      const gw = ghost.offsetWidth, gh = ghost.offsetHeight;
+      const from = { x: f.from.x + 18 + gw / 2, y: f.from.y + 22 };
+      const to = { x: f.to.r - gw / 2, y: f.to.b - gh / 2 };
+      if (f.from === B.bubble) { from.x = f.from.r - gw / 2; from.y = f.from.cy; to.x = f.to.x + 18 + gw / 2; to.y = f.to.y + 22; }
+      const p = inOut3(gp);
+      const gx = lerp(from.x, to.x, p), gy = lerp(from.y, to.y, p) - bell(p) * 18;
+      ghost.style.opacity = (seg(gp, 0, 0.15) * (1 - seg(gp, 0.72, 1))).toFixed(3);
+      ghost.style.transform = `translate(${(gx - gw / 2).toFixed(2)}px, ${(gy - gh / 2).toFixed(2)}px) scale(${lerp(1, 0.96, p).toFixed(3)})`;
+    }
+
+    // 12. Camera: zoom the content layer only; the title bar stays put.
+    let shot = SHOTS.wide(B);
+    for (const [at, name] of CAMERA.slice(1)) {
+      if (t < at[0]) break;
+      shot = mixShot(shot, SHOTS[name](B), inOut3(seg(t, ...at)));
+    }
+    const tx = clamp(VW / 2 - shot.x * shot.s, VW - VW * shot.s, 0);
+    const ty = clamp(VH / 2 - shot.y * shot.s, VH - VH * shot.s, 0);
+    cam.style.transform = `translate(${tx.toFixed(2)}px, ${ty.toFixed(2)}px) scale(${shot.s.toFixed(4)})`;
+
+    // 13. Captions.
+    caps.forEach((el, i) => {
+      const [a, b] = C.captions[i];
+      const pin = out3(seg(t, a, a + 0.35)), pout = inOut3(seg(t, b - 0.25, b));
+      el.style.opacity = (pin * (1 - pout)).toFixed(3);
+      el.style.translate = `0 ${((1 - pin) * 6 - pout * 4).toFixed(2)}px`;
+    });
+  }
+
+  /** End card: the rest is inked top to bottom on the final chord, then the name settles under it. */
+  function renderEnd(t) {
+    const [glyphEl, nameEl, pkgEl] = endEl.children;
+    const ink = inOut3(seg(t, C.end - 0.05, C.end + 1.0));
+    glyphEl.style.opacity = seg(t, C.end - 0.05, C.end + 0.1).toFixed(3);
+    glyphEl.style.transform = `translateY(${((1 - out3(seg(t, C.end - 0.05, C.end + 1.2))) * 8).toFixed(2)}px)`;
+    const fade = $('inkFade'), edge = lerp(-3, 23, ink);
+    fade.setAttribute('y1', edge.toFixed(3));
+    fade.setAttribute('y2', (edge + 3).toFixed(3));
+    const ein = (el, a, dy, dur = 0.8) => {
+      const p = out3(seg(t, a, a + dur));
+      el.style.opacity = p.toFixed(3);
+      el.style.transform = `translateY(${((1 - p) * dy).toFixed(2)}px)`;
+      return p;
+    };
+    const np = ein(nameEl, C.end + 0.8, 10, 1.0);
+    nameEl.style.letterSpacing = `${((1 - np) * 3).toFixed(2)}px`;
+    ein(pkgEl, C.end + 1.9, 6);
+  }
+
+  function render(t) {
+    renderScene(t);
+    renderEnd(t);
+  }
+  window.renderAt = render;
+
+  // ---------------------------------------------------------------- drive
+  const qs = new URLSearchParams(location.search).get('t');
+  if (typeof window.__T === 'number') {
+    render(window.__T);
+  } else if (qs !== null) {
+    render(Number(qs));
+  } else {
+    let origin = performance.now(), paused = false, at = 0;
+    const loop = (now) => {
+      if (!paused) at = ((now - origin) / 1000) % DURATION;
+      render(at);
+      requestAnimationFrame(loop);
+    };
+    addEventListener('keydown', (e) => {
+      if (e.key === ' ') { paused = !paused; origin = performance.now() - at * 1000; }
+      if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+        at = clamp(at + (e.key === 'ArrowRight' ? 0.5 : -0.5), 0, DURATION - 0.001);
+        origin = performance.now() - at * 1000;
+      }
+    });
+    requestAnimationFrame(loop);
+  }
+})();
+</script>
+</body>
+</html>
