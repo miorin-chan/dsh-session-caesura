@@ -33,6 +33,9 @@ Check whether new behavior belongs in its own bundle.
 
 ## Structure
 
+`npm run build:tools` compiles `.mts` tooling in `scripts/` to adjacent ignored `.mjs` files.
+Node.js 22.18 or newer runs the `.test.mts` files directly.
+
 - [src/client/index.tsx](src/client/index.tsx) owns the composer button and turn-tail card.
 - [src/lib/notes.ts](src/lib/notes.ts) owns browser storage and draft operations.
 - [src/host/index.ts](src/host/index.ts) is the inert Host entry.

@@ -3,3 +3,7 @@ node_modules/
 /index.js
 /client.js
 /lib/notes.js
+
+# Compiled tooling
+/scripts/build.mjs
+/scripts/sync-types.mjs
