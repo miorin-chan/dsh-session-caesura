@@ -1,5 +1,5 @@
 {
-  "name": "dsh-session-caesura",
+  "name": "@miorin/dsh-session-caesura",
   "version": "0.1.2",
   "private": true,
   "license": "MIT",

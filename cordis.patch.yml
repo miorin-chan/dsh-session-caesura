@@ -2,4 +2,4 @@
 # package.json `dsh.client` and carries Caesura.
 - insert:
     - id: dsh-session-caesura
-      name: 'dsh-session-caesura'
+      name: '@miorin/dsh-session-caesura'

@@ -28,7 +28,7 @@ test('registers localized slots, shows the rest while Mod is held and disposes i
   })
   try {
     await import('../client.js')
-    assert.equal(registration.id, NS)
+    assert.equal(registration.id, '@miorin/dsh-session-caesura')
     const effects = []
     const entries = new Map()
     const dictionaries = new Map()
