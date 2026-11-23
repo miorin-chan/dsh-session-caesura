@@ -1,2 +1,5 @@
 node_modules/
 *.tgz
+/index.js
+/client.js
+/lib/notes.js

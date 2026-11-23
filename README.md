@@ -21,5 +21,6 @@ Drafts with attachments, `@` reference chips or a leading slash stay in the norm
 Sending a note during generation queues it. The keyboard retains its usual Send behavior.
 Click the rest to save a note.
 
-Install this directory in **Plugins** > **Add plugin**.
+To install from a source checkout, run `npm ci` there to build the plugin,
+then select the directory in **Plugins** > **Add plugin**.
 See the [project documentation](docs/README.md) for checks.
