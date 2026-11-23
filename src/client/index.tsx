@@ -9,9 +9,11 @@ import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { canSaveDraft, canSendNote, createNoteStore, readNote, restoreNote, saveDraftAsNote, submitNote } from '../lib/notes.js'
 import { Icon, IconButton, styles, useNoteCopy } from './appearance.js'
+import { ComposerKeyboardFrame, primaryModifier, useComposerSaveAnchor } from './keyboard.js'
 import { labels } from './labels.js'
 
 const namespace = 'dsh-session-caesura'
+const frameSlot = 'conversation.hero.frame'
 const inputSlot = 'conversation.input.right'
 const tailSlot = 'conversation.chat.turnTail'
 
@@ -33,6 +35,9 @@ export function apply(ctx: Context): void {
     stylesheet.textContent = styles
     document.head.append(stylesheet)
     const notes = createNoteStore(() => window.localStorage, window)
+    const unregisterFrame = ctx.slots.inject(frameSlot, () => ctx.slots.register({
+      name: frameSlot, id: namespace,
+    }, ComposerKeyboardFrame))
     const unregisterInput = ctx.slots.inject(inputSlot, () => ctx.slots.register({
       name: inputSlot, id: namespace, locale: namespace,
     }, SaveButton))
@@ -42,6 +47,7 @@ export function apply(ctx: Context): void {
     return () => {
       unregisterTail()
       unregisterInput()
+      unregisterFrame()
       notes.dispose()
       stylesheet.remove()
     }
@@ -57,20 +63,22 @@ export function apply(ctx: Context): void {
       const input = useInput((state: InputState) => state)
       const [failedDraft, setFailedDraft] = useState<{ sessionId: string; revision: number } | null>(null)
       const modHeld = useModHeld()
-      const saveFailed = failedDraft?.sessionId === sessionId && failedDraft.revision === input.draftRev
-      if (endSeq === undefined || !idle || !allowed || input.queue.length > 0) return null
-
-      const showRest = modHeld && canSaveDraft(input)
-      if (!showRest && !saveFailed) return null
+      const ready = endSeq !== undefined && idle && allowed && input.queue.length === 0
+      const available = ready && canSaveDraft(input)
+      const save = useCallback(() => {
+        if (!available || inputActions.captureInsertion().draftRev !== input.draftRev) return
+        const result = saveDraftAsNote(input, endSeq, note => notes.write(sessionId, note), inputActions)
+        setFailedDraft(result === 'storage-error' ? { sessionId, revision: input.draftRev } : null)
+      }, [available, endSeq, input, inputActions, sessionId])
+      const anchor = useComposerSaveAnchor(available, save)
+      const saveFailed = ready && failedDraft?.sessionId === sessionId && failedDraft.revision === input.draftRev
+      const showRest = available && modHeld
+      if (!showRest && !saveFailed && anchor === null) return null
       return (
         <>
-          {showRest && (
-            <IconButton label={t('save')} save onClick={() => {
-              const result = saveDraftAsNote(input, endSeq, note => notes.write(sessionId, note), inputActions)
-              setFailedDraft(result === 'storage-error' ? { sessionId, revision: input.draftRev } : null)
-            }}><Icon name="rest" size={24} /></IconButton>
-          )}
+          {showRest && <IconButton label={t('save')} save onClick={save}><Icon name="rest" size={24} /></IconButton>}
           {saveFailed && <span role="alert" className="dsh-cn-save-error">{t('saveFailed')}</span>}
+          {anchor !== null && <span ref={anchor} hidden />}
         </>
       )
     }
@@ -103,10 +111,9 @@ export function apply(ctx: Context): void {
 function useModHeld(): boolean {
   const [held, setHeld] = useState(false)
   useEffect(() => {
-    const isMac = /^Mac/i.test(navigator.platform)
     const controller = new AbortController()
     const { signal } = controller
-    const update = (event: KeyboardEvent) => setHeld(isMac ? event.metaKey : event.ctrlKey)
+    const update = (event: KeyboardEvent) => setHeld(primaryModifier(event))
     const reset = () => setHeld(false)
     window.addEventListener('keydown', update, { capture: true, passive: true, signal })
     window.addEventListener('keyup', update, { capture: true, passive: true, signal })

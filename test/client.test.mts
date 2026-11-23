@@ -37,7 +37,11 @@ test('registers localized slots, shows the rest while Mod is held and disposes i
     let hookIndex = 0
     const react = {
       ...require('react'),
+      useCallback: <T>(callback: T) => callback,
+      useContext: () => null,
       useEffect: install => { if (componentEffects.length === 0) componentEffects.push(install()) },
+      useLayoutEffect: () => {},
+      useRef: <T>(current: T) => ({ current }),
       useState(initial) {
         const index = hookIndex++
         state[index] ??= initial
@@ -62,7 +66,7 @@ test('registers localized slots, shows the rest while Mod is held and disposes i
       },
     })
     assert.deepEqual(plugin.inject, ['slots', 'locale'])
-    assert.deepEqual([...entries.keys()], ['conversation.input.right', 'conversation.chat.turnTail'])
+    assert.deepEqual([...entries.keys()], ['conversation.hero.frame', 'conversation.input.right', 'conversation.chat.turnTail'])
     assert.equal(entries.get('conversation.chat.turnTail').options.locale, NS)
     assert.equal(Object.keys(dictionaries.get(NS)).length, 8)
     assert.equal(mountedStyles.size, 1)
