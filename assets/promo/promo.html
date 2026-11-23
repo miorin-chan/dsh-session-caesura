@@ -13,63 +13,64 @@
 
   The cue sheet below is shared: soundtrack.mts reads the same JSON to place music and UI sounds.
   All times are absolute seconds on the film's clock; one bar is 2.5 s at 96 BPM.
-  Pairs are [start, end]. `rewind` replays the sent branch backwards, from `rewindFrom` to `rewindTo`.
-  `save1` and `save2` fall on beats: the music rests for one beat there.
+  Pairs are [start, end]; `logo` is [ink start, ink end, fade start, fade end]. `rewind` replays the sent branch backwards, from `rewindFrom` to `rewindTo`.
+  `save1` and `save2` fall on beats: the music halts on a fermata and breaks off there for one beat.
 -->
 <script>window.__T = null; /*FRAME_T*/</script>
 <script id="timeline" type="application/json">
 {
-  "duration": 30.0,
+  "duration": 32.5,
   "bpm": 96,
-  "winIn": [0.1, 0.7],
-  "captions": [[0.3, 3.95], [4.05, 6.5], [7.5, 9.9], [10.0, 14.9], [15.0, 19.4], [19.5, 24.3]],
+  "logo": [0.15, 1.25, 1.85, 2.45],
+  "winIn": [2.6, 3.2],
+  "captions": [[2.8, 6.45], [6.55, 9], [10, 12.4], [12.5, 17.4], [17.5, 21.9], [22, 26.8]],
 
-  "r1Reply": [0.35, 1.25],
-  "r1Actions": [1.25, 1.5],
-  "focus": 1.55,
-  "noteKeys": [1.7, 1.74, 1.81, 1.86, 1.91, 1.97, 2.03, 2.08, 2.14, 2.2, 2.26, 2.32, 2.38, 2.45, 2.5, 2.55, 2.61, 2.67, 2.72, 2.78, 2.83, 2.9, 2.96, 3.01, 3.07, 3.13, 3.2, 3.26, 3.31, 3.38, 3.45, 3.5],
-  "enterKeys": [3.8, 4.45],
-  "enter": 4.0,
-  "sent": [4.05, 4.4],
-  "r2Think": [4.45, 4.65],
-  "r2Done": 5.0,
-  "r2Reply": [5.05, 5.75],
-  "r2Actions": [5.75, 6.0],
-  "rewind": [6.6, 7.4],
-  "rewindFrom": 6.6,
-  "rewindTo": 3.75,
+  "r1Reply": [2.85, 3.75],
+  "r1Actions": [3.75, 4],
+  "focus": 4.05,
+  "noteKeys": [4.2, 4.24, 4.31, 4.36, 4.41, 4.47, 4.53, 4.58, 4.64, 4.7, 4.76, 4.82, 4.88, 4.95, 5, 5.05, 5.11, 5.17, 5.22, 5.28, 5.33, 5.4, 5.46, 5.51, 5.57, 5.63, 5.7, 5.76, 5.81, 5.88, 5.95, 6],
+  "enterKeys": [6.3, 6.95],
+  "enter": 6.5,
+  "sent": [6.55, 6.9],
+  "r2Think": [6.95, 7.15],
+  "r2Done": 7.5,
+  "r2Reply": [7.55, 8.25],
+  "r2Actions": [8.25, 8.5],
+  "rewind": [9.1, 9.9],
+  "rewindFrom": 9.1,
+  "rewindTo": 6.25,
 
-  "compCam": [7.3, 8.0],
-  "modKeys": [7.8, 10.3],
-  "mod": [[8.05, 8.75], [9.1, 10.2]],
-  "cursor1": [9.15, 9.8],
-  "save1": 10.0,
-  "fly1": [10.05, 10.6],
-  "note1": [10.45, 10.95],
-  "noteCam": [10.1, 10.9],
-  "store": [11.3, 14.3],
+  "compCam": [9.8, 10.5],
+  "modKeys": [10.3, 12.8],
+  "mod": [[10.55, 11.25], [11.6, 12.7]],
+  "cursor1": [11.65, 12.3],
+  "save1": 12.5,
+  "fly1": [12.55, 13.1],
+  "note1": [12.95, 13.45],
+  "noteCam": [12.6, 13.4],
+  "store": [13.8, 16.8],
 
-  "appendKeys": [15.25, 15.3, 15.36, 15.43, 15.5, 15.57, 15.62, 15.71, 15.76, 15.82, 15.89],
-  "saveKeys": [16.1, 17.4],
-  "mod2": [16.3, 17.1],
-  "save2": 16.875,
-  "fly2": [16.92, 17.4],
-  "append": 17.35,
+  "appendKeys": [17.75, 17.8, 17.86, 17.93, 18, 18.07, 18.12, 18.21, 18.26, 18.32, 18.39],
+  "saveKeys": [18.6, 19.9],
+  "mod2": [18.8, 19.6],
+  "save2": 19.375,
+  "fly2": [19.42, 19.9],
+  "append": 19.85,
 
-  "actsCam": [19.4, 20.2],
-  "cursor2": [20.0, 20.6],
-  "tipSend": [20.8, 21.3],
-  "cursor3": [21.35, 21.75],
-  "copy": 21.9,
-  "cursor4": [22.2, 22.6],
-  "rewindNote": 22.8,
-  "flyBack": [22.9, 23.45],
-  "noteOut": [22.95, 23.4],
-  "fill": 23.45,
-  "afterCam": [22.8, 23.5],
+  "actsCam": [21.9, 22.7],
+  "cursor2": [22.5, 23.1],
+  "tipSend": [23.3, 23.8],
+  "cursor3": [23.85, 24.25],
+  "copy": 24.4,
+  "cursor4": [24.7, 25.1],
+  "rewindNote": 25.3,
+  "flyBack": [25.4, 25.95],
+  "noteOut": [25.45, 25.9],
+  "fill": 25.95,
+  "afterCam": [25.3, 26],
 
-  "winOut": [24.4, 25.0],
-  "end": 25.0
+  "winOut": [26.9, 27.5],
+  "end": 27.5
 }
 </script>
 <style>
@@ -174,7 +175,9 @@ svg { display: block; }
 .ripple { position: absolute; left: 0; top: 0; width: 44px; height: 44px; margin: -22px 0 0 -22px; border-radius: 50%; background: rgba(101, 117, 222, .28); opacity: 0; }
 #cursor { position: absolute; left: 0; top: 0; width: 20px; height: 24px; opacity: 0; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, .25)); transform-origin: 2px 1.5px; }
 
-/* End card */
+/* Logo and end card */
+#logo { position: absolute; inset: 0; display: grid; place-items: center; }
+.l-rest { width: 52px; height: 124px; }
 #end { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
 #end > * { opacity: 0; }
 .e-rest { width: 66px; height: 158px; }
@@ -182,7 +185,8 @@ svg { display: block; }
 .e-name .zh { font-family: var(--serif-zh); font-weight: 300; font-size: 40px; letter-spacing: 8px; margin-right: -8px; }
 .e-name .dot { align-self: center; width: 5px; height: 5px; margin-top: 6px; border-radius: 50%; background: #a4aab4; }
 .e-name .en { font-family: var(--serif-en); font-style: italic; font-size: 44px; letter-spacing: .5px; }
-.e-pkg { margin-top: 30px; font: 12.5px/1.4 var(--mono); color: #9aa0ab; letter-spacing: .3px; }
+.e-host { margin-top: 30px; font-size: 14px; letter-spacing: 2px; color: #6b717c; }
+.e-pkg { margin-top: 8px; font: 12px/1.4 var(--mono); color: #a4aab4; letter-spacing: .3px; }
 </style>
 </head>
 <body>
@@ -250,14 +254,12 @@ svg { display: block; }
     <div id="tape"></div>
   </div>
 
+  <div id="logo"><svg class="l-rest" viewBox="7.4 1 9.2 22" aria-hidden="true" data-ink="logo"></svg></div>
+
   <div id="end">
-    <svg class="e-rest" viewBox="7.4 1 9.2 22" aria-hidden="true">
-      <defs><linearGradient id="restFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8190ec"/><stop offset="1" stop-color="#5463d2"/></linearGradient>
-        <linearGradient id="inkFade" gradientUnits="userSpaceOnUse" x1="0" x2="0" y1="0" y2="3"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#000"/></linearGradient>
-        <mask id="ink" maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24"><rect x="0" y="0" width="24" height="24" fill="url(#inkFade)"/></mask></defs>
-      <path id="endRest" fill="url(#restFill)" mask="url(#ink)" d=""/>
-    </svg>
+    <svg class="e-rest" viewBox="7.4 1 9.2 22" aria-hidden="true" data-ink="end"></svg>
     <div class="e-name"><span class="zh">休止符</span><span class="dot"></span><span class="en" lang="en">Caesura</span></div>
+    <div class="e-host">DeepSeek Harness 插件</div>
     <div class="e-pkg">@miorin/dsh-session-caesura</div>
   </div>
 </div>
@@ -297,7 +299,19 @@ svg { display: block; }
   };
   for (const el of document.querySelectorAll('[data-glyph]')) el.outerHTML = glyph(el.dataset.glyph, Number(el.dataset.size || 17));
   for (const el of document.querySelectorAll('[data-icon]')) el.innerHTML = ICONS[el.dataset.icon];
-  $('endRest').setAttribute('d', REST_D);
+  /** The rest glyph with a soft ink edge that moves top to bottom (see `ink`). */
+  for (const svg of document.querySelectorAll('[data-ink]')) {
+    const id = svg.dataset.ink;
+    svg.innerHTML = `<defs><linearGradient id="${id}Fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8190ec"/><stop offset="1" stop-color="#5463d2"/></linearGradient>
+      <linearGradient id="${id}Fade" gradientUnits="userSpaceOnUse" x1="0" x2="0" y1="0" y2="3"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#000"/></linearGradient>
+      <mask id="${id}Ink" maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24"><rect x="0" y="0" width="24" height="24" fill="url(#${id}Fade)"/></mask></defs>
+      <path fill="url(#${id}Fill)" mask="url(#${id}Ink)" d="${REST_D}"/>`;
+  }
+  const ink = (id, p) => {
+    const fade = $(`${id}Fade`), edge = lerp(-3, 23, p);
+    fade.setAttribute('y1', edge.toFixed(3));
+    fade.setAttribute('y2', (edge + 3).toFixed(3));
+  };
 
   // ---------------------------------------------------------------- script
   const NOTE1 = '续期在 auth/refresh.ts：过期前 5 分钟静默刷新';
@@ -428,7 +442,7 @@ svg { display: block; }
     { at: C.cursor3, to: (B) => near(B.bCopy, 3, 4), arc: 10 },
     { at: C.cursor4, to: (B) => near(B.bRewind, 3, 4), arc: 10 },
   ];
-  const VISIBLE = [[C.cursor1[0] - 0.05, 10.7], [C.cursor2[0] - 0.05, C.rewindNote + 0.3]];
+  const VISIBLE = [[C.cursor1[0] - 0.05, C.save1 + 0.7], [C.cursor2[0] - 0.05, C.rewindNote + 0.3]];
   const CLICKS = [C.save1, C.copy, C.rewindNote];
 
   function pointer(t, B) {
@@ -603,15 +617,23 @@ svg { display: block; }
     });
   }
 
-  /** End card: the rest is inked top to bottom on the final chord, then the name settles under it. */
+  /** Logo: the rest is inked, holds, then lifts away as the window arrives. */
+  function renderLogo(t) {
+    const [a, b, c, d] = C.logo;
+    const el = $('logo').firstElementChild;
+    const out = inOut3(seg(t, c, d));
+    ink('logo', inOut3(seg(t, a, b)));
+    el.style.opacity = (seg(t, a, a + 0.1) * (1 - out)).toFixed(3);
+    el.style.transform = `translateY(${((1 - out3(seg(t, a, b + 0.2))) * 6 - out * 8).toFixed(2)}px)`;
+    el.style.filter = out > 0 ? `blur(${(out * 4).toFixed(2)}px)` : 'none';
+  }
+
+  /** End card: the rest is inked on the final chord, then the name settles under it and the credit follows. */
   function renderEnd(t) {
-    const [glyphEl, nameEl, pkgEl] = endEl.children;
-    const ink = inOut3(seg(t, C.end - 0.05, C.end + 1.0));
+    const [glyphEl, nameEl, hostEl, pkgEl] = endEl.children;
     glyphEl.style.opacity = seg(t, C.end - 0.05, C.end + 0.1).toFixed(3);
     glyphEl.style.transform = `translateY(${((1 - out3(seg(t, C.end - 0.05, C.end + 1.2))) * 8).toFixed(2)}px)`;
-    const fade = $('inkFade'), edge = lerp(-3, 23, ink);
-    fade.setAttribute('y1', edge.toFixed(3));
-    fade.setAttribute('y2', (edge + 3).toFixed(3));
+    ink('end', inOut3(seg(t, C.end - 0.05, C.end + 1.0)));
     const ein = (el, a, dy, dur = 0.8) => {
       const p = out3(seg(t, a, a + dur));
       el.style.opacity = p.toFixed(3);
@@ -620,10 +642,12 @@ svg { display: block; }
     };
     const np = ein(nameEl, C.end + 0.8, 10, 1.0);
     nameEl.style.letterSpacing = `${((1 - np) * 3).toFixed(2)}px`;
-    ein(pkgEl, C.end + 1.9, 6);
+    ein(hostEl, C.end + 1.7, 6);
+    ein(pkgEl, C.end + 2.0, 6);
   }
 
   function render(t) {
+    renderLogo(t);
     renderScene(t);
     renderEnd(t);
   }

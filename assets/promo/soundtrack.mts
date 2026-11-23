@@ -5,16 +5,19 @@
 //
 // 所有时间点读自 promo.html 里的 <script id="timeline">，与画面共用一份 cue sheet；
 // 改动画时间后重新运行即可保持同步。合成过程不依赖外部素材，同一输入输出按字节一致。
-// 乐器与母带处理沿用 dsh-next-actions 宣传片的 soundtrack.mts。
 //
-// 风格：lo-fi。温暖的电钢琴和弦 + 摇摆鼓组 + 圆润低音；界面音效全部是无音高的轻敲、点击、按键和风声。
-// 96 BPM，一小节 2.5 s，F 大调，Fmaj7–Am7–Dm9–Bbmaj7 四小节一循环。时间为成片绝对时间：
-//   0.0–7.5    动机：铺底与电钢琴；倒回时音乐压低，带一段倒带声
-//   7.5–10.0   按住 ⌘：踩镲 + 轻底鼓
-//   10.0–20.0  保存与追加：完整鼓组与低音
-//   20.0–25.0  复制、回退、发送：鼓组退场，Gm7 → C9sus4，反向和弦吸入
-//   25.0       Fmaj9 落点 = 片尾休止符开始落墨，随后淡出
-// 两次保存（save1、save2）都落在拍点上：音乐在那里休止一拍，只留下点击与界面音效。
+// 风格：古典室内乐。钢琴（加性合成，带弦的非谐性与击弦噪声）唱旋律、左手 Alberti 低音，
+// 弦乐组（失谐锯齿波、延迟颤音）铺和声，拨弦（Karplus–Strong）走低音线。
+// Andante，96 BPM 4/4，一小节 2.5 s，F 大调。时间为成片绝对时间：
+//   0.0–2.5    标志：钢琴琶音升起，弦乐轻铺
+//   2.5–9.1    动机：钢琴独奏，I–vi–IV–ii–V
+//   9.1–9.9    倒带：刚才奏过的音乐被倒着快放回去，音高随带速升降
+//   10.0–12.5  按住 ⌘：弦乐进入，停在属七和弦的延长记号上
+//   12.5       第一次保存：延长音被干净地切断，休止一拍（caesura），随后回到主和弦
+//   19.375     第二次保存：同样的延长、切断与休止
+//   20.0–27.5  全奏：拨弦、钢琴、弦乐，终止式走向片尾
+//   27.5       F 大调主和弦落在片尾休止符落墨的同一刻，名字出现时钢琴在高音区轻拨一串琶音
+// 休止的用法与乐谱上的 caesura（//）一致：音乐在延长音上悬住，切断后的寂静里只剩厅堂余响，再起下一句。
 
 import { readFileSync, writeFileSync } from 'node:fs';
 
@@ -33,6 +36,7 @@ interface CueSheet {
   duration: number;
   bpm: number;
   end: number;
+  logo: [number, number, number, number];
   winIn: CueRange;
   winOut: CueRange;
   r1Actions: CueRange;
@@ -43,6 +47,8 @@ interface CueSheet {
   r2Done: number;
   r2Actions: CueRange;
   rewind: CueRange;
+  rewindFrom: number;
+  rewindTo: number;
   mod: CueRange[];
   mod2: CueRange;
   save1: number;
@@ -66,15 +72,13 @@ const SR = 48000;
 const N = Math.round(T.duration * SR);
 const BEAT = 60 / C.bpm;
 const BAR = 4 * BEAT;
-const SIX = BEAT / 4;
-const SWING = SIX * 0.18;
-/** Bar 0 starts with the film. */
-const at = (bar: number, sixteenth: number) => bar * BAR + sixteenth * SIX;
+/** Time of `beat` (quarter notes, fractional allowed) in `bar`; bar 0 starts with the film. */
+const at = (bar: number, beat: number) => bar * BAR + beat * BEAT;
 
 // ------------------------------------------------------------------ primitives
 
-// Three buses: `keys` is ducked under the kick, `main` is not, and `sfx` carries the interface sounds.
-// The music buses (`main`, `keys`) pass through the rest gate; `sfx` does not. All feed the reverb send.
+// Three buses: `keys` (piano) and `main` (strings) are the music and pass through the caesura gate;
+// `sfx` carries the interface sounds and does not. All feed the reverb send.
 const stereo = () => [new Float32Array(N), new Float32Array(N)];
 const bus = {
   main: stereo(), keys: stereo(), sfx: stereo(),
@@ -163,61 +167,93 @@ function polyBlep(p: number, dt: number) {
 // ------------------------------------------------------------------ instruments
 
 /**
- * Mellow electric-piano note: FM at ratio 1 with a low, fast-decaying index (warmth, no bell partials),
- * a little second harmonic, slow tremolo and a velocity-dependent low-pass.
+ * Piano note. Partials follow stiff-string inharmonicity f_k = k·f·√(1 + B·k²); each decays in two stages
+ * (prompt sound, then aftersound), higher partials faster. The lowest partials use two slightly detuned strings,
+ * a short filtered noise burst stands in for the hammer, and the damper closes `dur` seconds after the attack.
+ * Oscillators rotate a phasor instead of calling sin per sample.
  */
-function epNote(m: number, dur: number, vel: number) {
-  const f = mtof(m), lp = biquad('lp', 1100 + 900 * vel, 0.7), rel = 0.12;
-  return render(dur + rel, (tt) => {
-    const env = (1 - Math.exp(-tt / 0.005)) * Math.exp(-tt / 1.6) * (tt > dur ? Math.exp(-(tt - dur) / (rel / 4)) : 1);
-    const idx = (0.3 + 0.5 * vel) * Math.exp(-tt / 0.25);
-    const x = Math.sin(TAU * f * tt + idx * Math.sin(TAU * f * tt)) + 0.12 * Math.sin(2 * TAU * f * tt) * Math.exp(-tt / 0.3);
-    return run(lp, x) * env * (1 + 0.12 * Math.sin(TAU * 4.8 * tt)) * vel;
-  });
-}
-
-/** Strummed chord: notes 12 ms apart, spread across the stereo field. Returns the mono sum when `bounce`. */
-function epChord(notes: number[], t0: number, dur: number, vel: number, { gain = 0.13, bounce = false } = {}) {
-  const strum = 0.012;
-  const sum = bounce ? new Float32Array(Math.round((dur + 0.15 + strum * notes.length) * SR)) : null;
-  notes.forEach((m, k) => {
-    const buf = epNote(m, dur - k * strum, vel * (k === 0 ? 1 : 0.85));
-    if (sum) buf.forEach((s, i) => { sum[i + Math.round(k * strum * SR)] += s; });
-    else place(buf, t0 + k * strum, { gain, pan: (k / (notes.length - 1) - 0.5) * 0.6, verb: 0.3, keys: true });
-  });
-  return sum;
-}
-
-/** Soft, dark detuned-saw pad under the keys. */
-function pad(notes: number[], t0: number, t1: number, { attack = 0.4, release = 0.7, gain = 0.035 } = {}) {
-  const hold = t1 - t0;
-  notes.forEach((m, k) => {
-    for (const cents of [-6, 6]) {
-      const f = mtof(m) * 2 ** (cents / 1200), dt = f / SR, lp = biquad('lp', 750, 0.6);
-      let p = rand();
-      const buf = render(hold + release, (tt) => {
-        const v = 2 * p - 1 - polyBlep(p, dt);
-        p += dt;
-        if (p >= 1) p -= 1;
-        const rise = Math.sin((Math.PI / 2) * Math.min(1, tt / attack)) ** 2;
-        const fall = tt > hold ? Math.exp(-(tt - hold) / (release / 4)) : 1;
-        return run(lp, v) * rise * fall;
-      });
-      place(buf, t0, { gain, pan: Math.sign(cents) * (k % 2 ? 0.5 : 0.3), verb: 0.4, keys: true });
+function pianoNote(m: number, dur: number, vel: number) {
+  const f = mtof(m), B = 0.00032;
+  const tau1 = clamp(3.2 * Math.sqrt(262 / f), 0.7, 6);
+  const damp = 0.09;
+  const len = Math.min(dur, tau1 * 4) + damp * 6;
+  const parts: { cr: number; ci: number; re: number; im: number; amp: number; tau: number }[] = [];
+  for (let k = 1; k <= 14; k++) {
+    const fk = k * f * Math.sqrt(1 + B * k * k);
+    if (fk > 9000) break;
+    const amp = k ** -1.25 * Math.exp(-(k - 1) * (0.55 - 0.35 * vel));
+    const tau = tau1 / (1 + 0.32 * (k - 1) ** 1.25);
+    for (const cents of k <= 3 ? [-0.9, 0.9] : [0]) {
+      const w = (TAU * fk * 2 ** (cents / 1200)) / SR, ph = rand() * TAU;
+      parts.push({ cr: Math.cos(w), ci: Math.sin(w), re: Math.cos(ph), im: Math.sin(ph), amp: k <= 3 ? amp / 2 : amp, tau });
     }
+  }
+  const hammer = biquad('lp', 1200 + 3000 * vel, 0.8);
+  const tone = biquad('lp', 2200 + 5200 * vel, 0.6);
+  return render(len, (tt) => {
+    let x = 0;
+    for (const p of parts) {
+      const re = p.re * p.cr - p.im * p.ci;
+      p.im = p.re * p.ci + p.im * p.cr;
+      p.re = re;
+      x += p.im * p.amp * (0.6 * Math.exp(-tt / (0.22 * p.tau)) + 0.4 * Math.exp(-tt / p.tau));
+    }
+    if (tt < 0.03) x += run(hammer, noise()) * 0.25 * vel * Math.exp(-tt / 0.006);
+    const attack = 1 - Math.exp(-tt / 0.0015);
+    const release = tt > dur ? Math.exp(-(tt - dur) / damp) : 1;
+    return run(tone, x) * attack * release * vel;
   });
 }
 
-const KICKS: number[] = [];
-function kick(t0: number, gain = 0.42) {
-  KICKS.push(t0);
-  let ph = 0;
-  const lp = biquad('lp', 1800);
-  const buf = render(0.45, (tt) => {
-    ph += (TAU * (42 + 70 * Math.exp(-tt / 0.04))) / SR;
-    return run(lp, Math.tanh(1.4 * Math.sin(ph) * Math.exp(-tt / 0.22) * (1 - Math.exp(-tt / 0.002))));
+/** Piano voice on the keys bus, panned by register like a grand seen from the audience. */
+function piano(m: number, t0: number, dur: number, vel: number) {
+  place(pianoNote(m, dur, vel), t0, { gain: 0.16, pan: clamp((m - 62) / 36, -0.6, 0.6), verb: 0.32, keys: true });
+}
+
+/** Pizzicato: Karplus–Strong string with a lowpassed pluck and a small body resonance. */
+function pizz(m: number, t0: number, vel: number, { t60 = 0.9, gain = 0.3, pan = -0.25 } = {}) {
+  const f = mtof(m), period = Math.max(2, Math.round(SR / f - 0.5));
+  const line = new Float32Array(period);
+  const pluck = biquad('lp', 500 + 2200 * vel, 0.7);
+  for (let i = 0; i < period; i++) line[i] = run(pluck, noise());
+  const rho = 10 ** (-3 / (t60 * f));
+  const body = biquad('bp', 260, 1.2);
+  let i = 0, prev = 0;
+  const buf = render(t60 + 0.1, (tt) => {
+    const y = line[i];
+    line[i] = rho * 0.5 * (y + prev);
+    prev = y;
+    if (++i >= period) i = 0;
+    return (y + 0.6 * run(body, y)) * vel * (1 - Math.exp(-tt / 0.001));
   });
-  place(buf, t0, { gain });
+  place(buf, t0, { gain, pan, verb: 0.3 });
+}
+
+/**
+ * Bowed string section: per note three detuned band-limited saws with a delayed vibrato, two lowpass stages,
+ * a slow bow attack and release. `swell` shapes the dynamics over the note (0–1 → gain multiplier).
+ */
+function strings(notes: number[], t0: number, t1: number, { gain = 0.05, attack = 0.35, release = 0.35, cutoff = 1900, swell = (_p: number) => 1, pan = 0.2 } = {}) {
+  const hold = t1 - t0;
+  notes.forEach((m, n) => {
+    const f = mtof(m);
+    const voices = [-7, 0, 7].map((cents) => ({ f: f * 2 ** (cents / 1200), p: rand(), vib: 5.1 + rand() * 0.8, vph: rand() * TAU }));
+    const lp1 = biquad('lp', cutoff * (m < 48 ? 0.55 : 1), 0.7), lp2 = biquad('lp', cutoff * 1.6, 0.6);
+    const buf = render(hold + release * 4, (tt) => {
+      let x = 0;
+      const depth = 0.0022 * clamp((tt - 0.25) / 0.4, 0, 1);
+      for (const v of voices) {
+        const fv = v.f * (1 + depth * Math.sin(TAU * v.vib * tt + v.vph)), dt = fv / SR;
+        x += 2 * v.p - 1 - polyBlep(v.p, dt);
+        v.p += dt;
+        if (v.p >= 1) v.p -= 1;
+      }
+      const rise = Math.sin((Math.PI / 2) * Math.min(1, tt / attack)) ** 2;
+      const fall = tt > hold ? Math.exp(-(tt - hold) / release) : 1;
+      return run(lp2, run(lp1, x / 3)) * rise * fall * swell(clamp(tt / hold, 0, 1));
+    });
+    place(buf, t0, { gain, pan: pan * (n % 2 ? 1 : -1) * (m < 48 ? 0.3 : 1), verb: 0.45 });
+  });
 }
 
 interface NoiseHitOptions {
@@ -237,7 +273,7 @@ function noiseHit(t0: number, { len, decay, type, f, q = Math.SQRT1_2, gain, pan
   place(buf, t0, { gain, pan, verb });
 }
 
-/** Short low sine thump; the "body" under taps, clicks and the snare. */
+/** Short low sine thump; the "body" under taps and clicks. */
 function thump(t0: number, f0: number, f1: number, decay: number, gain: number, pan = 0) {
   let ph = 0;
   const buf = render(decay * 6, (tt) => {
@@ -245,22 +281,6 @@ function thump(t0: number, f0: number, f1: number, decay: number, gain: number, 
     return Math.sin(ph) * Math.exp(-tt / decay) * (1 - Math.exp(-tt / 0.001));
   });
   place(buf, t0, { gain, pan });
-}
-
-const hat = (t0: number, gain: number) => noiseHit(t0, { len: 0.1, decay: 0.022, type: 'bp', f: 6500, q: 0.7, gain, pan: 0.2 });
-function snare(t0: number, gain = 0.12) {
-  noiseHit(t0, { len: 0.35, decay: 0.08, type: 'bp', f: 1600, q: 0.8, gain, pan: -0.08, verb: 0.25 });
-  thump(t0, 230, 185, 0.04, gain * 0.7);
-}
-
-function bass(m: number, t0: number, dur: number, gain = 0.22, decay = 1.4) {
-  const f = mtof(m), lp = biquad('lp', 700);
-  const buf = render(dur + 0.15, (tt) => {
-    const body = Math.exp(-Math.min(tt, dur) / decay) * (tt > dur ? Math.exp(-(tt - dur) / 0.03) : 1);
-    const x = Math.sin(TAU * f * tt) + 0.25 * Math.sin(2 * TAU * f * tt);
-    return run(lp, Math.tanh(1.4 * x) * Math.min(1, tt / 0.015) * body);
-  });
-  place(buf, t0, { gain });
 }
 
 /** Band-passed noise whose centre glides f0 → f1 (whoosh / swell). */
@@ -293,87 +313,128 @@ function key(t0: number, gain: number) {
   thump(t0, 160, 130, 0.008, gain * 0.5, pan);
 }
 
-function boom(t0: number, gain = 0.3) {
-  thump(t0, 60, 38, 0.6, gain);
+// ------------------------------------------------------------------ score
+
+// Pitches as MIDI numbers (F3 = 53, C4 = 60, F4 = 65, C5 = 72). Durations in beats.
+const pn = (m: number | number[], bar: number, beat: number, beats: number, vel = 0.55) =>
+  [m].flat().forEach((x) => piano(x, at(bar, beat), beats * BEAT, vel));
+/** Left-hand Alberti figure in eighths: low, high, middle, high, from `beat` for `beats` beats. */
+const alberti = ([lo, mid, hi]: number[], bar: number, beat: number, beats: number, vel = 0.32) => {
+  for (let k = 0; k < beats * 2; k++) piano([lo, hi, mid, hi][k % 4], at(bar, beat + k / 2), BEAT * 0.9, vel * (k % 2 ? 0.8 : 1));
+};
+/** Notes that must stop exactly at a caesura; the gate removes whatever tail is left. */
+const until = (t: number, bar: number, beat: number) => (t - at(bar, beat)) / BEAT;
+
+const F = [53, 57, 60], Dm = [50, 53, 57], Bb = [46, 50, 53], Gm = [43, 46, 50], C7 = [48, 52, 58], FC = [48, 53, 57];
+const CUT1 = C.save1, CUT2 = C.save2;
+const bar1 = Math.round(CUT1 / BAR);                // the bar the first caesura opens
+const bar2 = Math.round((CUT2 + BEAT) / BAR);       // the bar that follows the second caesura
+
+// Logo: an arpeggio rises with the ink, the strings breathe under it.
+[53, 57, 60, 65, 69, 72].forEach((m, k) => piano(m, C.logo[0] + 0.05 + k * 0.1, 2.3 - k * 0.1, 0.42 + k * 0.04));
+strings([53, 60, 65], C.logo[0], C.logo[3], { gain: 0.03, attack: 0.9, release: 0.6 });
+
+// Motivation: solo piano, I – vi IV – ii V.
+pn(69, 1, 0, 1); pn(72, 1, 1, 1); pn(77, 1, 2, 2, 0.6);
+alberti(F, 1, 0, 4);
+pn(74, 2, 0, 1); pn(72, 2, 1, 1); pn(70, 2, 2, 1); pn(69, 2, 3, 1);
+alberti(Dm, 2, 0, 2); alberti(Bb, 2, 2, 2);
+pn(70, 3, 0, 1); pn(69, 3, 1, 1); pn(67, 3, 2, 2);
+alberti(Gm, 3, 0, 2); alberti(C7, 3, 2, 2);
+
+// The shortcut: strings enter; the phrase rises to C7 and holds it under a fermata until the click.
+const fermata1 = at(bar1 - 1, 2);
+pn(74, bar1 - 1, 0, 1); pn(72, bar1 - 1, 1, 1);
+alberti(Bb, bar1 - 1, 0, 2);
+pn([76, 70], bar1 - 1, 2, until(CUT1, bar1 - 1, 2), 0.5);
+pn([48, 55, 58], bar1 - 1, 2, until(CUT1, bar1 - 1, 2), 0.36);
+strings([46, 62, 65], at(bar1 - 1, 0), fermata1, { gain: 0.035, attack: 0.5, release: 0.25 });
+strings([48, 64, 67, 70], fermata1, CUT1, { gain: 0.04, attack: 0.3, release: 0.012, swell: (p) => 0.6 + 0.5 * p });
+
+// Caesura. The next phrase starts on beat two with the tonic: the note has landed.
+pizz(41, at(bar1, 1), 0.8); pizz(48, at(bar1, 2), 0.6); pizz(45, at(bar1, 3), 0.6);
+pn(77, bar1, 1, 1, 0.6); pn(76, bar1, 2, 0.5); pn(74, bar1, 2.5, 0.5); pn(72, bar1, 3, 1);
+alberti(F, bar1, 1, 3);
+strings([57, 60, 65], at(bar1, 1), at(bar1 + 1, 0), { gain: 0.025, attack: 0.5 });
+pizz(46, at(bar1 + 1, 0), 0.7); pizz(53, at(bar1 + 1, 1), 0.5); pizz(48, at(bar1 + 1, 2), 0.7); pizz(55, at(bar1 + 1, 3), 0.5);
+pn(70, bar1 + 1, 0, 1); pn(74, bar1 + 1, 1, 1); pn(72, bar1 + 1, 2, 2);
+alberti(Bb, bar1 + 1, 0, 2); alberti([48, 52, 55], bar1 + 1, 2, 2);
+strings([58, 62, 65], at(bar1 + 1, 0), at(bar1 + 1, 2), { gain: 0.028 });
+strings([55, 60, 64], at(bar1 + 1, 2), at(bar1 + 2, 0), { gain: 0.028 });
+
+// Appending: vi, then C7 again under a fermata until ⌘ Enter.
+const b7 = bar2 - 1, fermata2 = at(b7, 2);
+pizz(50, at(b7, 0), 0.7); pizz(45, at(b7, 1), 0.5); pizz(48, fermata2, 0.7);
+pn(69, b7, 0, 1); pn(74, b7, 1, 1);
+alberti(Dm, b7, 0, 2);
+pn([76, 70], b7, 2, until(CUT2, b7, 2), 0.52);
+pn([48, 55, 58], b7, 2, until(CUT2, b7, 2), 0.36);
+strings([57, 62, 65], at(b7, 0), fermata2, { gain: 0.03, release: 0.25 });
+strings([48, 64, 67, 70], fermata2, CUT2, { gain: 0.042, attack: 0.25, release: 0.012, swell: (p) => 0.6 + 0.5 * p });
+
+// Caesura, then the full ensemble on the downbeat: I – IV ii – cadential 6/4 V7 – I.
+pizz(41, at(bar2, 0), 0.85); pizz(48, at(bar2, 2), 0.6);
+pn(77, bar2, 0, 2, 0.62); pn(72, bar2, 2, 1); pn(69, bar2, 3, 1);
+alberti(F, bar2, 0, 4, 0.34);
+strings([41], at(bar2, 0), at(bar2 + 1, 0), { gain: 0.05, cutoff: 1200 });
+strings([60, 65, 69], at(bar2, 0), at(bar2 + 1, 0), { gain: 0.032 });
+
+pizz(46, at(bar2 + 1, 0), 0.7); pizz(53, at(bar2 + 1, 1), 0.5); pizz(43, at(bar2 + 1, 2), 0.7); pizz(50, at(bar2 + 1, 3), 0.5);
+pn(70, bar2 + 1, 0, 0.5); pn(74, bar2 + 1, 0.5, 0.5); pn(77, bar2 + 1, 1, 1, 0.6); pn(74, bar2 + 1, 2, 1); pn(70, bar2 + 1, 3, 1);
+alberti(Bb, bar2 + 1, 0, 2); alberti(Gm, bar2 + 1, 2, 2);
+strings([46], at(bar2 + 1, 0), at(bar2 + 2, 0), { gain: 0.05, cutoff: 1200 });
+strings([58, 62, 65], at(bar2 + 1, 0), at(bar2 + 1, 2), { gain: 0.032 });
+strings([58, 62, 67], at(bar2 + 1, 2), at(bar2 + 2, 0), { gain: 0.032 });
+
+const END_BAR = Math.round(C.end / BAR);
+const b10 = END_BAR - 1;
+pizz(48, at(b10, 0), 0.8); pizz(48, at(b10, 2), 0.8);
+pn(72, b10, 0, 1); pn(77, b10, 1, 1, 0.6); pn(76, b10, 2, 1);
+[67, 70, 72, 76].forEach((m, k) => pn(m, b10, 3 + k / 4, 0.25, 0.48 + k * 0.04));
+alberti(FC, b10, 0, 2); alberti(C7, b10, 2, 2);
+strings([36], at(b10, 0), C.end, { gain: 0.055, cutoff: 1100 });
+strings([57, 60, 65], at(b10, 0), at(b10, 2), { gain: 0.034 });
+strings([55, 64, 70], at(b10, 2), C.end, { gain: 0.036, swell: (p) => 0.7 + 0.5 * p });
+
+// Final tonic with the end card's ink; a high arpeggio as the name settles.
+pn([41, 53, 60, 65, 69, 72, 77], END_BAR, 0, 5, 0.7);
+pizz(29, C.end, 0.9, { t60: 1.6 });
+strings([41, 53, 57, 60, 65, 69], C.end, T.duration - 1.8, { gain: 0.034, attack: 0.25, release: 0.9 });
+[77, 81, 84, 89].forEach((m, k) => piano(m, C.end + 0.8 + k * 0.13, 2.4, 0.3 + k * 0.03));
+
+// ------------------------------------------------------------------ tape rewind
+
+/**
+ * Replace the music under the rewind with the music of the sent branch, played backwards and fast,
+ * so the score retraces the picture. Tape speed eases in and out, so the pitch rises and falls with it.
+ * Content above 3 kHz is filtered out first; the fastest passage runs at about seven times speed.
+ */
+function rewindMusic([d0, d1]: CueRange, s0: number, s1: number, silentUntil: number) {
+  const len = Math.round((d1 - d0) * SR), j0 = Math.round(d0 * SR), stop = Math.round(silentUntil * SR);
+  for (const ch of [...bus.main, ...bus.keys, ...bus.mainSend, ...bus.keysSend]) {
+    const lp1 = biquad('lp', 3000, 0.7), lp2 = biquad('lp', 3000, 0.7);
+    const src = ch.slice(Math.round(s0 * SR), Math.round(s1 * SR)).map((x) => run(lp2, run(lp1, x)));
+    const fadeIn = 0.03 * SR, fadeOut = 0.08 * SR, cut = 0.02 * SR;
+    for (let j = j0 - cut; j < stop; j++) {
+      if (j < j0) ch[j] *= (j0 - j) / cut;
+      else ch[j] = 0;
+    }
+    for (let j = 0; j < len; j++) {
+      const u = 0.5 - 0.5 * Math.cos((Math.PI * j) / len);
+      const pos = (1 - u) * (src.length - 1), i = Math.floor(pos), fr = pos - i;
+      const x = src[i] * (1 - fr) + (src[Math.min(i + 1, src.length - 1)] ?? 0) * fr;
+      ch[j0 + j] = x * Math.min(1, j / fadeIn, (len - j) / fadeOut);
+    }
+  }
 }
-
-// ------------------------------------------------------------------ music
-
-const FMAJ7 = [53, 57, 60, 64], AM7 = [55, 57, 60, 64], DM9 = [53, 57, 60, 64], BBMAJ7 = [53, 57, 58, 62];
-const GM7 = [53, 55, 58, 62], C9SUS4 = [53, 55, 58, 62];
-const LOOP = [FMAJ7, AM7, DM9, BBMAJ7];
-const ROOTS = [41, 45, 38, 34];                     // F2 A2 D2 Bb1, under LOOP
-const END_BAR = Math.round(C.end / BAR);            // the final chord lands on this bar
-const BREAK_BAR = END_BAR - 2;                      // drums leave for the note actions
-const HATS_BAR = Math.round(C.rewind[1] / BAR);     // hats and a light kick once the feature starts
-const GROOVE = Math.round(C.save1 / BAR);           // full groove from the first save
-
-const chordOf = (bar: number) => (bar < BREAK_BAR ? LOOP[bar % 4] : bar === BREAK_BAR ? GM7 : C9SUS4);
-
-// Opening: the pad swells under a soft chord, the keys comp gently through the motivation.
-pad(FMAJ7, 0, at(1, 0), { attack: 1.6, gain: 0.04 });
-epChord(FMAJ7, 0.1, 2.3, 0.5);
-for (let bar = 1; bar < END_BAR; bar++) {
-  const notes = chordOf(bar);
-  const hits = bar === END_BAR - 1 ? [[0, 1], [6, 0.55]] : [[0, 0.9], [6, 0.5], [10, 0.65]];
-  hits.forEach(([step, vel], i) => {
-    const next = i + 1 < hits.length ? hits[i + 1][0] : 16;
-    epChord(notes, at(bar, step), (next - step) * SIX, vel * (bar < HATS_BAR ? 0.8 : 1));
-  });
-  pad(notes, at(bar, 0), at(bar + 1, 0));
-}
-
-// Reverse swell of the final chord, ending exactly on the hit.
-const FINAL = [55, 57, 60, 64, 69];
-const swell = epChord(FINAL, 0, 0.9, 0.8, { bounce: true })!.reverse();
-const swellLen = swell.length / SR;
-swell.forEach((s, i, a) => { a[i] = s * Math.min(1, i / (0.2 * SR)); });
-place(swell, C.end - swellLen, { gain: 0.12, verb: 0.3, keys: true });
-
-epChord(FINAL, C.end, 3.2, 0.9);
-pad(FINAL, C.end, T.duration - 1.4, { attack: 0.05, release: 1.4, gain: 0.04 });
-
-// Drums: hats and a light kick for the shortcut, the swung groove from the first save.
-const swing = (step: number) => (step % 4 === 2 ? SWING : 0);
-const hats = (bar: number, gain = 1, steps = [0, 2, 4, 6, 8, 10, 12, 14]) =>
-  steps.forEach((step) => hat(at(bar, step) + swing(step), (step % 4 ? 0.035 : 0.02) * gain));
-hats(1, 0.35, [0, 4, 8, 12]);
-hats(2, 0.45, [0, 4, 8, 12]);
-for (let bar = HATS_BAR; bar < GROOVE; bar++) {
-  hats(bar, 0.8);
-  kick(at(bar, 0), 0.3);
-  kick(at(bar, 8), 0.26);
-}
-for (let bar = GROOVE; bar < BREAK_BAR; bar++) {
-  for (const step of [0, 6, 10]) kick(at(bar, step));
-  for (const step of [4, 12]) snare(at(bar, step));
-  hats(bar);
-}
-snare(at(BREAK_BAR - 1, 14), 0.06);
-snare(at(BREAK_BAR - 1, 15), 0.08);
-hats(BREAK_BAR, 0.5, [0, 4, 8, 12]);
-hats(BREAK_BAR + 1, 0.4, [0, 4, 8]);
-sweep(at(END_BAR - 1, 8), C.end, 400, 2500, { gain: 0.035, q: 0.8, verb: 0.2, shape: (p) => p ** 2 });
-kick(C.end, 0.48);
-boom(C.end);
-
-for (let bar = GROOVE; bar < BREAK_BAR; bar++) {
-  const m = ROOTS[bar % 4];
-  bass(m, at(bar, 0), 5 * SIX);
-  bass(m, at(bar, 6), 3 * SIX);
-  bass(m, at(bar, 10), 5 * SIX);
-}
-bass(43, at(BREAK_BAR, 0), 9 * SIX, 0.18);
-bass(43, at(BREAK_BAR, 10), 5 * SIX, 0.16);
-bass(36, at(END_BAR - 1, 0), C.end - at(END_BAR - 1, 0) - 0.01, 0.18);
-bass(29, C.end, 2.4, 0.2, 1.2);
+rewindMusic(C.rewind, C.rewindTo, C.rewindFrom, at(Math.ceil(C.rewind[1] / BAR), 0));
 
 // ------------------------------------------------------------------ interface sounds (no pitched tones)
 
 layer = 'sfx';
 
-/** Tape rewind: band-passed noise falling in pitch with a fast flutter that slows down. */
-function rewindFx(t0: number, t1: number, gain = 0.07) {
+/** Tape hiss under the rewind: band-passed noise falling in pitch with a fast flutter that slows down. */
+function rewindFx(t0: number, t1: number, gain = 0.035) {
   const len = t1 - t0, fl = biquad('bp', 2800, 2.2);
   let ph = 0;
   const buf = render(len, (tt, i) => {
@@ -385,40 +446,39 @@ function rewindFx(t0: number, t1: number, gain = 0.07) {
   place(buf, t0, { gain, verb: 0.2 });
 }
 
-sweep(C.winIn[0], C.winIn[1] + 0.1, 700, 2600, { gain: 0.04, q: 1.0 });                              // 窗口出现
+sweep(C.winIn[0], C.winIn[1] + 0.1, 700, 2600, { gain: 0.035, q: 1.0 });                             // 窗口出现
 tap(C.r1Actions[0], 0.03, { f: 2000, pan: -0.25 });                                                  // 操作行
-[...C.noteKeys, ...C.appendKeys].forEach((t) => key(t, 0.1 * (0.8 + 0.4 * rand())));               // 打字
-key(C.enter, 0.14);                                                                                   // Enter：发出去
-sweep(C.sent[0], C.sent[0] + 0.38, 700, 3800, { gain: 0.06, q: 1.2, pan: 0.2, shape: (p) => Math.sin(Math.PI * p) });
+[...C.noteKeys, ...C.appendKeys].forEach((t) => key(t, 0.09 * (0.8 + 0.4 * rand())));              // 打字
+key(C.enter, 0.13);                                                                                   // Enter：发出去
+sweep(C.sent[0], C.sent[0] + 0.38, 700, 3800, { gain: 0.05, q: 1.2, pan: 0.2, shape: (p) => Math.sin(Math.PI * p) });
 tap(C.r2Think[0], 0.03, { f: 1800, pan: -0.3 });                                                     // 思考中
-sweep(C.r2Think[1], C.r2Done + 0.05, 1200, 4000, { gain: 0.018, q: 2 });
 tap(C.r2Done, 0.035, { f: 2400, pan: -0.3 });                                                        // 已完成
 tap(C.r2Actions[0], 0.03, { f: 2000, pan: -0.25 });
 rewindFx(C.rewind[0] - 0.05, C.rewind[1] + 0.05);                                                    // 倒回
 for (const [t0, t1] of [...C.mod, C.mod2]) {                                                          // 按下 / 松开 ⌘
-  key(t0, 0.12);
-  thump(t0 + 0.02, 320, 190, 0.03, 0.07, 0.25);                                                       // 休止符出现
-  key(t1, 0.06);
+  key(t0, 0.11);
+  thump(t0 + 0.02, 320, 190, 0.03, 0.06, 0.25);                                                       // 休止符出现
+  key(t1, 0.055);
 }
-click(C.save1, 0.26, 0.1);                                                                            // 点休止符
-key(C.save2, 0.14);                                                                                   // ⌘ Enter
+click(C.save1, 0.24, 0.1);                                                                            // 点休止符
+key(C.save2, 0.13);                                                                                   // ⌘ Enter
 for (const [fly, land] of [[C.fly1, C.note1[0] + 0.2], [C.fly2, C.append]] as const) {
-  sweep(fly[0], fly[1], 900, 3200, { gain: 0.05, q: 1.1, pan: 0.15 });                               // 草稿飞向结语
-  thump(land, 220, 120, 0.05, 0.12);                                                                  // 落入结语
-  noiseHit(land, { len: 0.03, decay: 0.006, type: 'bp', f: 1200, q: 1, gain: 0.05 });
+  sweep(fly[0], fly[1], 900, 3200, { gain: 0.045, q: 1.1, pan: 0.15 });                              // 草稿飞向结语
+  thump(land, 220, 120, 0.05, 0.11);                                                                  // 落入结语
+  noiseHit(land, { len: 0.03, decay: 0.006, type: 'bp', f: 1200, q: 1, gain: 0.045 });
 }
 tap(C.store[0], 0.04, { f: 2800, pan: -0.2 });                                                       // 标注
-click(C.copy, 0.22, 0.15);                                                                            // 复制
+click(C.copy, 0.2, 0.15);                                                                             // 复制
 tap(C.copy + 0.06, 0.04, { f: 2600, pan: 0.15 });                                                    // ✓
-click(C.rewindNote, 0.24, 0.15);                                                                      // 回退
-sweep(C.flyBack[0], C.flyBack[1], 3200, 900, { gain: 0.055, q: 1.1, pan: -0.15 });                   // 结语飞回输入框
-thump(C.fill, 220, 120, 0.05, 0.12);
-noiseHit(C.fill, { len: 0.03, decay: 0.006, type: 'bp', f: 1200, q: 1, gain: 0.05 });
-sweep(C.winOut[0], C.winOut[1], 2600, 700, { gain: 0.035, q: 1.0 });                                  // 窗口退场
+click(C.rewindNote, 0.22, 0.15);                                                                      // 回退
+sweep(C.flyBack[0], C.flyBack[1], 3200, 900, { gain: 0.05, q: 1.1, pan: -0.15 });                    // 结语飞回输入框
+thump(C.fill, 220, 120, 0.05, 0.11);
+noiseHit(C.fill, { len: 0.03, decay: 0.006, type: 'bp', f: 1200, q: 1, gain: 0.045 });
+sweep(C.winOut[0], C.winOut[1], 2600, 700, { gain: 0.03, q: 1.0 });                                   // 窗口退场
 
 // ------------------------------------------------------------------ master
 
-function freeverb(inL: Float32Array, inR: Float32Array, { room = 0.82, damp = 0.4 } = {}) {
+function freeverb(inL: Float32Array, inR: Float32Array, { room = 0.86, damp = 0.32 } = {}) {
   const k = SR / 44100;
   const line = (d: number) => ({ buf: new Float32Array(Math.round(d * k)), i: 0, store: 0 });
   const chan = (spread: number) => ({
@@ -450,34 +510,25 @@ function freeverb(inL: Float32Array, inR: Float32Array, { room = 0.82, damp = 0.
   return out;
 }
 
-// The rest gate: music stops for one beat at each save and sinks under the rewind; sfx pass untouched.
+// The caesura gate: after each fermata the music is cut cleanly for one beat. The gate sits before the reverb,
+// so the hall's tail of the held chord keeps ringing through the silence.
 const gate = new Float32Array(N).fill(1);
-const shapeGate = (t0: number, t1: number, depth: number, down: number, up: number) => {
-  for (let n = Math.max(0, Math.round((t0 - down) * SR)); n < Math.min(N, Math.round((t1 + up) * SR)); n++) {
-    const tt = n / SR;
-    const fall = clamp((tt - (t0 - down)) / down, 0, 1), rise = clamp((t1 + up - tt) / up, 0, 1);
-    const g = 1 - depth * (0.5 - 0.5 * Math.cos(Math.PI * Math.min(fall, rise)));
+for (const t of [CUT1, CUT2]) {
+  const a = Math.round(t * SR), b = Math.round((t + BEAT) * SR), ramp = Math.round(0.012 * SR);
+  for (let n = a - ramp; n < Math.min(N, b + ramp); n++) {
+    const g = n < a ? (a - n) / ramp : n < b ? 0 : (n - b) / ramp;
     gate[n] = Math.min(gate[n], g);
   }
-};
-for (const t of [C.save1, C.save2]) shapeGate(t, t + BEAT - 0.012, 1, 0.012, 0.012);
-shapeGate(C.rewind[0] + 0.1, C.rewind[1] - 0.2, 0.75, 0.25, 0.25);
-
-// Keys duck under each kick (fast dip, 140 ms recovery) so the groove breathes.
-const duck = new Float32Array(N).fill(1);
-for (const tk of KICKS) {
-  const i0 = Math.round(tk * SR);
-  for (let i = i0; i < Math.min(N, i0 + SR); i++) duck[i] = Math.min(duck[i], 1 - 0.3 * Math.exp(-(i - i0) / (0.14 * SR)));
 }
-const sendOf = (c: number) => bus.mainSend[c].map((x, n) => (x + bus.keysSend[c][n] * duck[n]) * gate[n] + bus.sfxSend[c][n]);
+const sendOf = (c: number) => bus.mainSend[c].map((x, n) => (x + bus.keysSend[c][n]) * gate[n] + bus.sfxSend[c][n]);
 const wet = freeverb(sendOf(0), sendOf(1));
 const mix = [0, 1].map((c) => {
-  const hp = biquad('hp', 28);
-  return bus.main[c].map((x, n) => run(hp, (x + bus.keys[c][n] * duck[n]) * gate[n] + bus.sfx[c][n] + wet[c][n] * 1.1));
+  const hp = biquad('hp', 30);
+  return bus.main[c].map((x, n) => run(hp, (x + bus.keys[c][n]) * gate[n] + bus.sfx[c][n] + wet[c][n] * 1.3));
 });
 
 // Level: RMS to TARGET_RMS dBFS, soft knee above 0.7, peak at -1 dBFS; short fade at both ends.
-const TARGET_RMS = -17.5;
+const TARGET_RMS = -19;
 let sum = 0;
 for (let n = 0; n < N; n++) sum += (mix[0][n] ** 2 + mix[1][n] ** 2) / 2;
 const scale = 10 ** (TARGET_RMS / 20) / Math.sqrt(sum / N);
@@ -487,7 +538,7 @@ const knee = (x: number) => {
 };
 let peak = 0;
 for (const ch of mix) for (let n = 0; n < N; n++) {
-  const fade = Math.min(1, n / (0.01 * SR), (N - n) / (0.25 * SR));
+  const fade = Math.min(1, n / (0.01 * SR), (N - n) / (0.4 * SR));
   ch[n] = knee(ch[n] * scale) * fade;
   peak = Math.max(peak, Math.abs(ch[n]));
 }
