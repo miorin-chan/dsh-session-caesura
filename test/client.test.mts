@@ -1,13 +1,14 @@
 import assert from 'node:assert/strict'
 import { createRequire } from 'node:module'
 import { test } from 'node:test'
-import { createNoteStore, readNote, restoreNote, saveDraftAsNote, submitNote } from '../lib/notes.js'
+import { canSaveDraft, createNoteStore, emptyComposer, sameDraft } from '../lib/notes.js'
 
 const require = createRequire(import.meta.url)
 const NS = 'dsh-session-caesura'
 const empty = { draft: '', phase: 'plain', attachmentIds: [], occurrences: [] }
 const draft = { ...empty, draft: 'For tomorrow\n  second line' }
-const note = { endSeq: 42, text: draft.draft }
+const note = { endSeq: 42, text: draft.draft, references: [], attachments: [] }
+const keyOf = (session: string) => `dsh.closing-note.${session}`
 
 function fakeStorage() {
   const data = new Map()
@@ -18,7 +19,7 @@ function fakeStorage() {
   }
 }
 
-test('registers localized slots, shows the rest while Mod is held and disposes its resources', async () => {
+test('registers localized slots and keeps the rest active for the current saved note', async () => {
   let registration
   globalThis.window = Object.assign(new EventTarget(), {
     __ModuleLoader__: { load: entry => { registration = entry } },
@@ -39,16 +40,19 @@ test('registers localized slots, shows the rest while Mod is held and disposes i
     const componentEffects = []
     const state = []
     let hookIndex = 0
+    const cardElement = { querySelector: () => null }
+    const marker = { closest: () => cardElement }
     const react = {
       ...require('react'),
       useCallback: <T>(callback: T) => callback,
       useContext: () => null,
+      useMemo: create => create(),
       useEffect: install => { if (componentEffects.length === 0) componentEffects.push(install()) },
-      useLayoutEffect: () => {},
-      useRef: <T>(current: T) => ({ current }),
+      useLayoutEffect: install => install(),
+      useRef: <T>(current: T) => ({ current: current ?? marker }),
       useState(initial) {
         const index = hookIndex++
-        state[index] ??= initial
+        if (!(index in state)) state[index] = initial
         return [state[index], value => { state[index] = value }]
       },
       useSyncExternalStore: (_subscribe, snapshot) => snapshot(),
@@ -58,14 +62,17 @@ test('registers localized slots, shows the rest while Mod is held and disposes i
       UserMessageBubble: () => null,
       IconCopyOutlineRegular: () => null,
       IconSendOutlineRegular: () => null,
+      formatQuoteText: text => text.split('\n').map(line => `> ${line}`).join('\n'),
     }
     const plugin = registration.factory(id => {
       if (id === 'react') return react
+      if (id === 'react-dom') return { createPortal: child => child }
       if (id === '@deepseek-ai/dsh-client-ui-primitives') return publishedUi
       return require(id)
     })
     plugin.apply({
       effect: install => effects.push(install()),
+      conversation: { blocks: { storeFor: () => ({ subscribe: () => {}, getSnapshot: () => undefined }) } },
       slots: {
         inject: (_name, install) => install(),
         register: (options, component) => {
@@ -84,7 +91,7 @@ test('registers localized slots, shows the rest while Mod is held and disposes i
         },
       },
     })
-    assert.deepEqual(plugin.inject, ['slots', 'locale'])
+    assert.deepEqual(plugin.inject, ['slots', 'locale', 'sessions', 'conversation'])
     assert.deepEqual([...entries.keys()], ['conversation.hero.frame', 'conversation.input.right', 'conversation.chat.turnTail'])
     assert.equal(entries.get('conversation.chat.turnTail').options.locale, NS)
     assert.equal(Object.keys(dictionaries.get(NS)).length, 8)
@@ -93,15 +100,20 @@ test('registers localized slots, shows the rest while Mod is held and disposes i
     const composer = entries.get('conversation.input.right').component
     let running = false
     let currentDraft = draft
-    function renderComposer() {
-      hookIndex = 0
-      return composer({
-        sessionId: 'session', t: key => key,
-        useChat: select => select({ timeline: { turnOrder: ['turn'], turns: new Map([['turn', { end: { seq: 42 } }]]) } }),
-        useSession: select => select({ openState: 'open', running, pendingSubmissions: [], subagent: null }),
-        useAccess: () => true,
-        useInput: select => select({ ...currentDraft, queue: [] }),
-      })
+    function renderComposer(sessionId = 'session') {
+      const render = () => {
+        hookIndex = 0
+        return composer({
+          sessionId, t: key => key,
+          useChat: select => select({ timeline: { turnOrder: ['turn'], turns: new Map([['turn', { end: { seq: 42 } }]]) } }),
+          useSession: select => select({ openState: 'open', running, pendingSubmissions: [], subagent: null }),
+          useAccess: () => true,
+          useProjection: () => undefined,
+          useInput: select => select({ ...currentDraft, queue: [] }),
+        })
+      }
+      render()
+      return render().props.children[1].props.children[0] || null
     }
     function key(type: 'keydown' | 'keyup', init: KeyboardEventInit = {}) {
       const event = Object.assign(new Event(type, { cancelable: true }), { key: '', metaKey: false, ctrlKey: false }, init)
@@ -121,13 +133,12 @@ test('registers localized slots, shows the rest while Mod is held and disposes i
         key('keydown', { key: other, [secondary]: true })
         assert.equal(renderComposer(), null)
         key('keydown', { key: mod })
-        assert.equal(renderComposer()?.props.children[0].props['data-dsh-session-caesura-save'], '')
+        assert.equal(renderComposer()?.props['data-dsh-session-caesura-save'], '')
         key('keyup', { key: mod })
         assert.equal(renderComposer(), null)
         key('keydown', { key: 'a', [primary]: true })
-        assert.equal(renderComposer()?.props.children[0].props['data-dsh-session-caesura-save'], '')
-        for (const ineligible of [empty, { ...draft, draft: '/model' },
-          { ...draft, attachmentIds: ['file'] }, { ...draft, occurrences: ['chip'] }]) {
+        assert.equal(renderComposer()?.props['data-dsh-session-caesura-save'], '')
+        for (const ineligible of [empty, { ...draft, phase: 'sending' }]) {
           currentDraft = ineligible
           assert.equal(renderComposer(), null)
         }
@@ -145,8 +156,20 @@ test('registers localized slots, shows the rest while Mod is held and disposes i
         }
         componentEffects.pop()()
         key('keydown', { [primary]: true })
-        assert.equal(state[1], false)
+        assert.equal(state[2], false)
       }
+      window.localStorage.setItem(keyOf('session'), JSON.stringify({ endSeq: 42, text: 'Previously saved' }))
+      assert.equal(renderComposer().props['aria-label'], 'append')
+      assert.equal(renderComposer().props.disabled, false)
+      assert.equal(renderComposer('another-session'), null)
+      currentDraft = empty
+      assert.equal(renderComposer().props.disabled, true)
+      running = true
+      assert.equal(renderComposer(), null)
+      currentDraft = { ...empty, attachmentIds: ['image'] }
+      assert.equal(renderComposer().props.disabled, false)
+      window.localStorage.removeItem(keyOf('session'))
+      assert.equal(renderComposer(), null)
     } finally {
       if (originalNavigator) Object.defineProperty(globalThis, 'navigator', originalNavigator)
       else delete globalThis.navigator
@@ -164,7 +187,7 @@ test('registers localized slots, shows the rest while Mod is held and disposes i
     state.length = 0
     hookIndex = 0
     const [, stack, actions] = card.type(card.props).props.children
-    const bubble = stack.props.children
+    const bubble = stack.props.children[1]
     assert.equal(bubble.type, publishedUi.UserMessageBubble)
     assert.equal(bubble.props.children, quoted.text)
     const [time, copy, rewind, send] = actions.props.children
@@ -186,63 +209,39 @@ test('registers localized slots, shows the rest while Mod is held and disposes i
   }
 })
 
-test('saves exact draft text before clearing the composer and never submits it', () => {
-  const calls = []
-  const actions = {
-    setDraft: text => calls.push(['draft', text]), persistDraft: () => calls.push(['persist']),
-    submit: () => assert.fail('saving must not send'),
-  }
-  assert.equal(saveDraftAsNote(draft, 42, stored => calls.push(['save', stored]), actions), 'saved')
-  assert.deepEqual(calls, [['save', note], ['draft', ''], ['persist']])
-})
-
-test('refuses drafts with attachments, reference chips, slash commands or a pending send', () => {
-  const unexpected = () => assert.fail('blocked drafts must stay intact')
-  const actions = { setDraft: unexpected, persistDraft: unexpected }
-  for (const input of [empty, { ...draft, draft: ' /goal' }, { ...draft, phase: 'sending' },
-    { ...draft, attachmentIds: ['file'] }, { ...draft, occurrences: ['chip'] }]) {
-    assert.equal(saveDraftAsNote(input, 42, unexpected, actions), 'blocked')
-  }
-})
-
-test('leaves the draft intact on storage failure', () => {
-  const unexpected = () => assert.fail('the draft must remain intact')
-  assert.equal(saveDraftAsNote(draft, 42, () => { throw new Error('no storage') }, {
-    setDraft: unexpected, persistDraft: unexpected,
-  }), 'storage-error')
-})
-
-test('uses ordinary submission only when the composer is empty', () => {
-  const calls = []
-  const actions = {
-    setDraft: text => calls.push(['draft', text]), persistDraft: () => calls.push(['persist']),
-    submit: () => calls.push(['submit']),
-  }
-  assert.equal(submitNote(draft, note, actions), false)
-  assert.equal(submitNote({ ...empty, phase: 'sending' }, note, actions), false)
-  assert.equal(submitNote(empty, note, actions), true)
-  assert.deepEqual(calls, [['draft', note.text], ['persist'], ['submit']])
+test('accepts nonempty editable native drafts and guards media changes independently of text revision', () => {
+  const mediaOnly = { ...empty, draftRev: 11, attachmentIds: ['image', 'file'], queue: [] }
+  for (const input of [draft, { ...draft, draft: ' /goal' }, { ...draft, phase: 'claimed' }, mediaOnly,
+    { ...draft, occurrences: ['chip'] }]) assert.equal(canSaveDraft(input), true)
+  for (const input of [empty, { ...draft, phase: 'adjudicating' }, { ...mediaOnly, phase: 'submitting' },
+    { ...draft, phase: 'sending' }]) assert.equal(canSaveDraft(input), false)
+  assert.equal(emptyComposer(empty), true)
+  assert.equal(emptyComposer(mediaOnly), false)
+  assert.equal(sameDraft(mediaOnly, { ...mediaOnly }), true)
+  assert.equal(sameDraft(mediaOnly, { ...mediaOnly, attachmentIds: ['image'] }), false)
+  assert.equal(sameDraft(mediaOnly, { ...mediaOnly, attachmentIds: ['file', 'image'] }), false)
+  assert.equal(sameDraft(mediaOnly, { ...mediaOnly, draftRev: 12 }), false)
 })
 
 test('appends to a legacy note, records the latest save time and notifies readers', ({ mock }) => {
   const storage = fakeStorage()
   const events = new EventTarget()
   const store = createNoteStore(() => storage, events)
-  const existing = { ...note, text: `${note.text}\r\n \t\r\n` }
-  storage.setItem('dsh.closing-note.a', JSON.stringify(existing))
-  assert.deepEqual(readNote(store.read('a')), existing)
+  const legacy = { endSeq: 42, text: `${note.text}\r\n \t\r\n` }
+  storage.setItem(keyOf('a'), JSON.stringify(legacy))
+  assert.deepEqual(store.decode(store.read('a')), { ...note, ...legacy })
   let updates = 0
   const unsubscribe = store.subscribe('a', () => { updates++ })
   let now = 1_795_000_000_000
   mock.method(Date, 'now', () => now)
-  store.append('a', { endSeq: 42, text: '\n\t\n  Next note' })
-  const appended = { endSeq: 42, text: `${note.text}\n\n  Next note`, savedAt: now }
-  assert.deepEqual(readNote(store.read('a')), appended)
+  store.append('a', { ...note, text: '\n\t\n  Next note' })
+  const appended = { ...note, text: `${note.text}\n\n  Next note`, quotes: [], savedAt: now }
+  assert.deepEqual(store.decode(store.read('a')), appended)
   now += 60_000
-  store.append('a', { endSeq: 51, text: 'After another turn' })
+  store.append('a', { ...note, endSeq: 51, text: 'After another turn' })
   assert.equal(updates, 2)
-  assert.deepEqual(readNote(store.read('a')), { endSeq: 51, text: `${appended.text}\n\nAfter another turn`, savedAt: now })
-  assert.equal(readNote(store.read('b')), null)
+  assert.deepEqual(store.decode(store.read('a')), { ...appended, endSeq: 51, text: `${appended.text}\n\nAfter another turn`, savedAt: now })
+  assert.equal(store.decode(store.read('b')), null)
   const event = new Event('storage')
   Object.defineProperty(event, 'key', { value: 'dsh.closing-note.a' })
   events.dispatchEvent(event)
@@ -251,38 +250,37 @@ test('appends to a legacy note, records the latest save time and notifies reader
   store.dispose()
   events.dispatchEvent(event)
   assert.equal(updates, 3)
-  for (const invalid of ['{', 'null', '{"endSeq":2,"text":"/command"}', '{"endSeq":-1,"text":"note"}']) {
-    assert.equal(readNote(invalid), null)
+  for (const invalid of ['{', 'null', '{"endSeq":2,"text":" "}', '{"endSeq":-1,"text":"note"}']) {
+    assert.equal(store.decode(invalid), null)
   }
   for (const savedAt of [null, '2026-11-23', 1.5, Number.MAX_SAFE_INTEGER]) {
-    assert.deepEqual(readNote(JSON.stringify({ ...note, savedAt })), note)
+    assert.deepEqual(store.decode(JSON.stringify({ ...note, savedAt })), note)
   }
 })
 
-test('rewind restores the note without sending and only removes the matching saved version', ({ mock }) => {
+test('preserves attachment order, quote and reference offsets, and the leading command across appends', () => {
   const storage = fakeStorage()
   const store = createNoteStore(() => storage, new EventTarget())
-  const savedAt = 1_795_000_000_000
-  mock.method(Date, 'now', () => savedAt)
-  let current = draft.draft
-  const persisted = []
-  const actions = {
-    setDraft: text => { current = text },
-    persistDraft: () => persisted.push(current),
-    submit: () => assert.fail('rewind must not send'),
-  }
-  store.append('a', note)
-  const saved = { ...note, savedAt }
-  assert.equal(restoreNote(draft, note, actions), false)
-  assert.deepEqual(readNote(store.read('a')), saved)
-  store.append('a', { ...note, text: 'New note' })
-  store.remove('a', saved)
-  const combined = { ...saved, text: `${note.text}\n\nNew note` }
-  store.remove('a', { ...combined, savedAt: savedAt - 1 })
-  assert.deepEqual(readNote(store.read('a')), combined)
-  assert.equal(restoreNote(empty, combined, actions), true)
-  assert.deepEqual(persisted, [combined.text])
-  store.remove('a', combined)
-  assert.equal(readNote(store.read('a')), null)
+  const image = { id: 1, kind: 'image', name: 'test.png', type: 'image/png' }
+  const file = { id: 2, kind: 'file', name: 'test.txt', type: 'text/plain' }
+  const reference = { offset: 2, length: 6, source: 'file', ref: 'a.md', label: 'a.md', appearance: 'file', clipboardText: '@a.md!' }
+  const summary = { label: 'Quote', title: 'Summary', body: 'first\nsecond' }
+  const quote = { offset: 10, length: '> first\n> second'.length, text: summary.body, summary }
+  const leading = '/goal next\n'
+  store.append('a', { ...note, text: leading, command: { token: '/goal ' }, attachments: [image] })
+  const firstVersion = store.read('a')
+  store.append('a', { ...note, text: '\n\n@a.md!\n\n> first\n> second', references: [reference], quotes: [quote] })
+  store.append('a', { ...note, text: '', attachments: [file] })
+  store.remove('a', firstVersion)
+  const combined = store.decode(store.read('a'))
+  assert.equal(combined.text, '/goal next\n\n@a.md!\n\n> first\n> second')
+  assert.deepEqual(combined.command, { token: '/goal ' })
+  assert.deepEqual(combined.references, [{ ...reference, offset: leading.length + 1 }])
+  assert.deepEqual(combined.quotes, [{ ...quote, offset: leading.length + 9 }])
+  assert.deepEqual(combined.attachments, [image, file])
+  assert.equal(store.decode(JSON.stringify({ ...combined, references: [{ ...combined.references[0], offset: 0 }] })), null)
+  assert.equal(store.decode(JSON.stringify({ ...combined, attachments: [{ ...image, id: 'runtime-only' }] })), null)
+  store.remove('a', store.read('a'))
+  assert.equal(store.read('a'), null)
   store.dispose()
 })

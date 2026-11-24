@@ -25,10 +25,24 @@ export const styles = bundledChatStyles + `
 .dsh-cn-note .dsh-cn-actions {
   flex-wrap: wrap; justify-content: flex-end; height: auto; max-width: 100%; opacity: 1;
 }
-/* Overlay the primary action from the right slot without adding toolbar width.
-   Geometry and card background follow @deepseek-ai/dsh-client-ui-conversation 0.2.2-rc.5,
-   src/client/skeleton/InputBar.module.css (.card, .row, .primary, .trailing).
+.dsh-cn-media { display: grid; gap: 6px; justify-items: end; max-width: 100%; }
+.dsh-cn-media-item { display: grid; gap: 4px; justify-items: end; max-width: 100%; min-width: 0; }
+.dsh-cn-media :is(audio, video) { max-width: min(320px, 100%); }
+.dsh-cn-image img { max-width: 100%; }
+.dsh-cn-file {
+  display: flex; align-items: center; gap: 8px; max-width: 100%; min-width: 0;
+  padding: 6px 10px; border: 1px solid var(--dsw-alias-border-l4); border-radius: var(--dsw-radius-md);
+  color: var(--dsw-alias-label-primary); overflow-wrap: anywhere;
+}
+/* The portaled rest uses the native primary action's space and follows the
+   geometry in @deepseek-ai/dsh-client-ui-conversation 0.2.2-rc.5 InputBar.module.css.
    Copyright (c) 2026 DeepSeek, MIT. See docs/dsh-ui-MIT.txt. */
+[data-composer-card]:has(> .dsh-cn-save[data-append]) > div > div > button[aria-busy="false"] {
+  visibility: hidden;
+}
+[data-composer-card]:has([hidden] [data-dsh-cn-anchor]) > .dsh-cn-save:not([data-append]) {
+  display: none;
+}
 .dsh-cn-save {
   position: absolute;
   right: 8px; bottom: 8px; z-index: 1;
@@ -40,6 +54,7 @@ export const styles = bundledChatStyles + `
   background: var(--dsw-specific-input-major);
   color: var(--dsw-alias-label-secondary);
 }
+.dsh-cn-save:disabled { cursor: default; color: var(--dsw-alias-label-tertiary); }
 .dsh-cn-save-error {
   box-sizing: border-box;
   position: absolute;
@@ -59,7 +74,7 @@ export const styles = bundledChatStyles + `
   outline-offset: -2px;
 }
 @media (hover: hover) {
-  .dsh-cn-save:hover { color: var(--dsw-alias-label-primary); }
+  .dsh-cn-save:enabled:hover { color: var(--dsw-alias-label-primary); }
 }
 .dsh-cn-status { color: var(--dsw-alias-state-error-primary); font-size: 12px; }
 `
