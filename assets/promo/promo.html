@@ -79,9 +79,10 @@
   --sans: system-ui, "PingFang SC", "Helvetica Neue", sans-serif;
   /* "SF Mono" / ui-monospace are not reachable headless and fall back to PingFang (long dashes). */
   --mono: Menlo, Monaco, monospace;
-  /* End card: Songti for the Chinese name, Bodoni italic for the Latin one, like an expression mark in a score. */
+  /* End card: Songti for the Chinese name; Zapfino, Hermann Zapf's calligraphic script, for the Latin one,
+     whose pen strokes echo the rest glyph's curve. */
   --serif-zh: "Songti SC", "STSong", serif;
-  --serif-en: "Bodoni 72", "Didot", serif;
+  --script-en: "Zapfino", "Snell Roundhand", serif;
   --accent: #6575de;
 
   /* DSH dark theme tokens (design-platform.css, 0.2.2) */
@@ -186,11 +187,12 @@ svg { display: block; }
 #end { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
 #end > * { opacity: 0; }
 .e-rest { width: 66px; height: 158px; }
-.e-name { display: flex; align-items: baseline; gap: 18px; margin-top: 34px; color: var(--ink-hi); }
+.e-name { display: flex; align-items: baseline; gap: 18px; margin-top: 12px; color: var(--ink-hi); }
 .e-name .zh { font-family: var(--serif-zh); font-weight: 300; font-size: 40px; letter-spacing: 8px; margin-right: -8px; }
-.e-name .dot { align-self: center; width: 5px; height: 5px; margin-top: 6px; border-radius: 50%; background: var(--ink-faint); }
-.e-name .en { font-family: var(--serif-en); font-style: italic; font-size: 44px; letter-spacing: .5px; }
-.e-host { margin-top: 30px; font-size: 14px; letter-spacing: 2px; color: var(--ink-lo); }
+/* An empty flex item's baseline is its border-box bottom; lift the dot to the middle of the Chinese glyphs. */
+.e-name .dot { align-self: baseline; width: 5px; height: 5px; transform: translateY(-13px); border-radius: 50%; background: var(--ink-faint); }
+.e-name .en { margin-left: -14px; padding: 0 14px; font-family: var(--script-en); font-size: 38px; }
+.e-host { margin-top: 14px; font-size: 14px; letter-spacing: 2px; color: var(--ink-lo); }
 .e-pkg { margin-top: 8px; font: 12px/1.4 var(--mono); color: var(--ink-faint); letter-spacing: .3px; }
 </style>
 </head>
@@ -661,8 +663,12 @@ svg { display: block; }
       el.style.transform = `translateY(${((1 - p) * dy).toFixed(2)}px)`;
       return p;
     };
+    const [zhEl, , enEl] = nameEl.children;
     const np = ein(nameEl, C.end + 0.8, 10, 1.0);
-    nameEl.style.letterSpacing = `${((1 - np) * 3).toFixed(2)}px`;
+    zhEl.style.letterSpacing = `${(8 + (1 - np) * 3).toFixed(2)}px`;
+    // The script is written left to right, a soft-edged mask following the pen.
+    const pen = -12 + 124 * inOut3(seg(t, C.end + 1.0, C.end + 2.2));
+    enEl.style.webkitMaskImage = enEl.style.maskImage = `linear-gradient(90deg, #000 ${pen.toFixed(1)}%, transparent ${(pen + 12).toFixed(1)}%)`;
     ein(hostEl, C.end + 1.7, 6);
     ein(pkgEl, C.end + 2.0, 6);
   }

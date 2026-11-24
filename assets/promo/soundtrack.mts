@@ -7,17 +7,18 @@
 // 改动画时间后重新运行即可保持同步。合成过程不依赖外部素材，同一输入输出按字节一致。
 //
 // 风格：氛围电子乐。只用合成器本来的音色，不模仿原声乐器：温暖的模拟风格铺底、模态合成的马林巴式拨奏、
-// 柔和的 FM 颤音琴、正弦低音和一套轻电子鼓，拨奏与颤音琴送进附点八分的乒乓回声。
+// 柔和的 FM 颤音琴和正弦低音，拨奏与颤音琴送进附点八分的乒乓回声。
 // 96 BPM 4/4，一小节 2.5 s，F 大调，Fmaj9–Dm9/Bbmaj9–Gm9/C11。时间为成片绝对时间：
 //   0.0–2.5    标志：铺底吸气般升起，颤音琴琶音随落墨上行
 //   2.5–9.1    动机，轻微诙谐：踮脚的马林巴配柔和的「嘭-嚓」低音；发送时短滑哨，思考时木鱼，回复时远处的弱音长号
 //   9.1–9.9    倒带：刚才奏过的音乐被倒着快放回去，音高随带速升降
-//   10.0–12.5  按住 ⌘：build，十六分拨奏渐强，铺底滤波打开，riser 推向点击
-//   12.5       第一次保存：一切切断，空一拍（caesura），drop 在第二拍随结语落定，进入半速律动
-//   19.375     按 Enter 追加：鼓组退场，短 build 被 Enter 切断，空一拍
-//   20.0–27.5  完整 drop：放松的律动、上行的颤音琴旋律；最后两拍鼓组退场，riser 推向片尾
+//   10.0–12.5  按住 ⌘：轻轻蓄势，拨奏渐强，铺底略微打开，轻柔的 riser 推向点击
+//   12.5       第一次保存：一切切断，空一拍（caesura），柔和的主和弦在第二拍随结语落定
+//   19.375     按 Enter 追加：又一次轻轻蓄势，被 Enter 切断，空一拍
+//   20.0–27.5  安静的收束：没有鼓，八分拨奏、铺底与上行的颤音琴旋律
 //   27.5       F 大调和弦落在片尾休止符落墨的同一刻，名字出现时颤音琴轻声回应
-// 休止的用法取自电子乐 drop 前的 break：张力推到最高时切断，留一拍空白，回声与混响的尾巴在空白里飘着，再落下。
+// 休止的用法取自电子乐的 break：蓄势到最高处切断，留一拍空白，回声与混响的尾巴在空白里飘着，再轻轻落下。
+// 片子后半没有鼓，保持安静，与插件本身的气质一致。
 
 import { readFileSync, writeFileSync } from 'node:fs';
 
@@ -77,7 +78,7 @@ const at = (bar: number, beat: number) => bar * BAR + beat * BEAT;
 
 // ------------------------------------------------------------------ primitives
 
-// Three buses: `keys` (pad, bass, mallets; ducked under the kick) and `main` (drums, risers) are the music and pass through the caesura gate;
+// Three buses: `keys` (pad, bass, mallets, vibraphone) and `main` (risers, woodblock) are the music and pass through the caesura gate;
 // `sfx` carries the interface sounds and does not. All feed the reverb send.
 const stereo = () => [new Float32Array(N), new Float32Array(N)];
 const bus = {
@@ -173,8 +174,8 @@ function polyBlep(p: number, dt: number) {
 // ------------------------------------------------------------------ instruments
 
 // Every voice here is native to a synthesizer, so nothing has to pass for an acoustic instrument:
-// a warm analog-style pad, a marimba-like mallet from modal synthesis, a soft FM vibraphone, a sine sub bass,
-// and a gentle electronic kit. Mallets and the vibraphone feed a ping-pong echo.
+// a warm analog-style pad, a marimba-like mallet from modal synthesis, a soft FM vibraphone and a sine sub bass,
+// plus a few comic voices for the opening. Mallets and the vibraphone feed a ping-pong echo.
 
 /**
  * Pad: per side two detuned band-limited saws over a quiet sine an octave down, through a resonant lowpass whose
@@ -250,32 +251,6 @@ function bass(m: number, t0: number, dur: number, vel = 0.7) {
   place(buf, t0, { gain: 0.11, keys: true });
 }
 
-const KICKS: number[] = [];
-/** Soft kick: a sine dropping from 110 to 46 Hz with a short felt click; registered for the sidechain duck. */
-function kick(t0: number, vel = 0.8) {
-  KICKS.push(t0);
-  let ph = 0;
-  const lp = biquad('lp', 1500, 0.7);
-  const buf = render(0.5, (tt) => {
-    ph += (TAU * (46 + 64 * Math.exp(-tt / 0.035))) / SR;
-    return run(lp, Math.sin(ph) * Math.exp(-tt / 0.26) + (tt < 0.004 ? noise() * 0.15 : 0)) * vel * (1 - Math.exp(-tt / 0.0015));
-  });
-  place(buf, t0, { gain: 0.24 });
-}
-
-/** Soft clap: three quick filtered bursts and a short tail, mostly heard through the reverb. */
-function clap(t0: number, vel = 0.6) {
-  [0, 0.011, 0.022].forEach((d, k) => noiseHit(t0 + d, { len: 0.05, decay: 0.008, type: 'bp', f: 1300, q: 1.1, gain: 0.1 * vel * (k === 2 ? 1.3 : 1), verb: 0.5 }));
-  noiseHit(t0 + 0.022, { len: 0.25, decay: 0.06, type: 'bp', f: 1100, q: 0.9, gain: 0.05 * vel, verb: 0.6 });
-}
-
-/** Shaker / hat: highpassed noise below 10 kHz; `open` lengthens it into an open hat. */
-function shaker(t0: number, vel = 0.5, open = false) {
-  const hp = biquad('hp', 5000, 0.7), lp = biquad('lp', 9500, 0.7), decay = open ? 0.09 : 0.02;
-  const buf = render(decay * 5, (tt) => run(lp, run(hp, noise())) * Math.exp(-tt / decay) * (1 - Math.exp(-tt / 0.002)));
-  place(buf, t0, { gain: (open ? 0.22 : 0.32) * vel, pan: open ? -0.2 : 0.3, verb: 0.15 });
-}
-
 /** Comic bass: a band-limited square with a plucky filter envelope, played short, like a bassoon on tiptoe. */
 function tuba(m: number, t0: number, dur: number, vel = 0.7) {
   const f = mtof(m), lp = biquad('lp', 1600, 1.1);
@@ -333,16 +308,6 @@ function sadTrombone(m: number, t0: number, dur: number, { last = false, vel = 0
 /** Woodblock tick for the waiting: a resonant noise click over a tiny thump. */
 function woodblock(t0: number, high: boolean, vel = 0.6) {
   noiseHit(t0, { len: 0.06, decay: 0.012, type: 'bp', f: high ? 1900 : 1350, q: 9, gain: 0.3 * vel, pan: high ? 0.25 : -0.25, verb: 0.2 });
-}
-
-/** Low impact for the drops: a long sine boom. */
-function boom(t0: number, gain = 0.3) {
-  let ph = 0;
-  const buf = render(1.6, (tt) => {
-    ph += (TAU * (38 + 30 * Math.exp(-tt / 0.08))) / SR;
-    return Math.sin(ph) * Math.exp(-tt / 0.55) * (1 - Math.exp(-tt / 0.002));
-  });
-  place(buf, t0, { gain, verb: 0.2 });
 }
 
 /**
@@ -439,18 +404,6 @@ function arp(c: Chord, bar: number, beat: number, beats: number, { step = 0.5, v
   const n = Math.round(beats / step);
   for (let k = 0; k < n; k++) mallet(c.top[ARP[k % ARP.length]], T0(bar, beat + k * step), vel(k / n) * (k % 2 ? 0.8 : 1), { echo, pan: k % 2 ? 0.25 : -0.25 });
 }
-/** Half-time groove: kick on 1 and the and of 3, clap on 3, offbeat hats. */
-function grooveA(bar: number, from = 0, to = 4) {
-  for (const b of [0, 2.5]) if (b >= from && b < to) kick(T0(bar, b), 0.7);
-  if (2 >= from && 2 < to) clap(T0(bar, 2), 0.5);
-  for (let b = 0.5; b < 4; b += 1) if (b >= from && b < to) shaker(T0(bar, b), 0.6);
-}
-/** Laid-back groove: kick on 1 and 3 with a pickup, soft claps on 2 and 4, offbeat hats and a light shaker. */
-function grooveB(bar: number, to = 4) {
-  for (const b of [0, 2, 3.5]) if (b < to) kick(T0(bar, b), b === 3.5 ? 0.5 : 0.75);
-  for (const b of [1, 3]) if (b < to) clap(T0(bar, b), 0.45);
-  for (let b = 0; b < to; b += 0.25) shaker(T0(bar, b), b % 1 === 0.5 ? 0.7 : 0.3, b % 1 === 0.5);
-}
 const ramp = (a: number, b: number) => (p: number) => a + (b - a) * p;
 
 const CUT1 = C.save1, CUT2 = C.save2;
@@ -481,71 +434,58 @@ const wah = C.r2Reply[0], step = 0.4;
 [[58, 0], [57, 1], [56, 2]].forEach(([m, k]) => sadTrombone(m, wah + k * step, step * 0.8));
 sadTrombone(55, wah + 3 * step, C.rewind[0] - (wah + 3 * step) + 0.3, { last: true });
 
-// The shortcut: a build. Sixteenth mallets swell, the pad filter opens, a riser climbs into the click.
+// From here on the score stays quiet, like the plugin: no drums, only pad, slow mallets, a soft sub bass and
+// the vibraphone. The shortcut is a gentle swell; the pad opens a little and a soft riser leans into the click.
 const build1 = T0(bar1 - 1, 0);
-pad(CH.Bb.pad, build1, T0(bar1 - 1, 2), { attack: 0.3, open: ramp(1500, 2200) });
-pad(CH.C.pad, T0(bar1 - 1, 2), CUT1, { attack: 0.2, release: 0.01, open: ramp(2200, 3600) });
-arp(CH.Bb, bar1 - 1, 0, 2, { step: 0.25, vel: ramp(0.32, 0.48) });
-arp(CH.C, bar1 - 1, 2, 2, { step: 0.25, vel: ramp(0.48, 0.62) });
-bass(CH.Bb.root, build1, D(1.95), 0.6); bass(CH.C.root, T0(bar1 - 1, 2), CUT1 - T0(bar1 - 1, 2) - 0.01, 0.65);
-for (let b = 0; b < 4; b += 0.25) shaker(T0(bar1 - 1, b), 0.25 + 0.5 * (b / 4));
-kick(T0(bar1 - 1, 2), 0.55); kick(T0(bar1 - 1, 3), 0.6);
-riser(build1, CUT1, 48);
+pad(CH.Bb.pad, build1, T0(bar1 - 1, 2), { attack: 0.5, open: ramp(1300, 1600) });
+pad(CH.C.pad, T0(bar1 - 1, 2), CUT1, { attack: 0.4, release: 0.01, open: ramp(1600, 2200) });
+arp(CH.Bb, bar1 - 1, 0, 2, { vel: ramp(0.28, 0.36) });
+arp(CH.C, bar1 - 1, 2, 2, { vel: ramp(0.36, 0.44) });
+bass(CH.Bb.root, build1, D(1.95), 0.4); bass(CH.C.root, T0(bar1 - 1, 2), CUT1 - T0(bar1 - 1, 2) - 0.01, 0.42);
+riser(build1, CUT1, 48, 0.45);
 
-// Caesura. The drop lands on beat two, together with the note: impact, then a half-time groove.
-const drop1 = T0(bar1, 1);
-boom(drop1, 0.16); kick(drop1, 0.9);
-pad(CH.F.pad, drop1, T0(bar1 + 1, 0), { attack: 0.12, open: () => 2300 });
-arp(CH.F, bar1, 1, 3, { vel: () => 0.5 });
-bass(CH.F.root, drop1, D(1.4), 0.75); bass(CH.F.root, T0(bar1, 2.5), D(1.4), 0.7);
-grooveA(bar1, 1.5);
-pad(CH.Dm.pad, T0(bar1 + 1, 0), T0(bar1 + 1, 2), { attack: 0.2, open: () => 2300 });
-pad(CH.Bb.pad, T0(bar1 + 1, 2), T0(bar1 + 2, 0), { attack: 0.2, open: () => 2300 });
-arp(CH.Dm, bar1 + 1, 0, 2, { vel: () => 0.5 }); arp(CH.Bb, bar1 + 1, 2, 2, { vel: () => 0.5 });
-bass(CH.Dm.root, T0(bar1 + 1, 0), D(1.4), 0.75); bass(CH.Dm.root, T0(bar1 + 1, 1.5), D(0.45), 0.6);
-bass(CH.Bb.root, T0(bar1 + 1, 2), D(1.4), 0.75); bass(CH.Bb.root, T0(bar1 + 1, 3.5), D(0.45), 0.6);
-grooveA(bar1 + 1);
-for (const [bar, beat, m] of [[bar1, 1.5, 72], [bar1, 2, 74], [bar1, 3, 72], [bar1 + 1, 0, 69], [bar1 + 1, 2, 70], [bar1 + 1, 3, 72]] as const) vibe(m, T0(bar, beat), 0.4, { dur: 1.6 });
+// Caesura. The note lands on beat two with a soft tonic and a few mallets.
+const land1 = T0(bar1, 1);
+pad(CH.F.pad, land1, T0(bar1 + 1, 0), { attack: 0.25, open: () => 1500 });
+arp(CH.F, bar1, 1, 3, { step: 1, vel: () => 0.38 });
+bass(CH.F.root, land1, D(2.9), 0.4);
+pad(CH.Dm.pad, T0(bar1 + 1, 0), T0(bar1 + 1, 2), { attack: 0.4, open: () => 1500 });
+pad(CH.Bb.pad, T0(bar1 + 1, 2), T0(bar1 + 2, 0), { attack: 0.4, open: () => 1500 });
+arp(CH.Dm, bar1 + 1, 0, 2, { step: 1, vel: () => 0.36 }); arp(CH.Bb, bar1 + 1, 2, 2, { step: 1, vel: () => 0.36 });
+bass(CH.Dm.root, T0(bar1 + 1, 0), D(1.9), 0.4); bass(CH.Bb.root, T0(bar1 + 1, 2), D(1.9), 0.4);
+for (const [bar, beat, m] of [[bar1, 1.5, 72], [bar1, 2, 74], [bar1, 3, 72], [bar1 + 1, 0, 69], [bar1 + 1, 2, 70], [bar1 + 1, 3, 72]] as const) vibe(m, T0(bar, beat), 0.32, { dur: 1.6 });
 
-// Appending: Gm9 with the groove, then the drums fall away into a short build that Enter cuts off.
-pad(CH.Gm.pad, T0(b7, 0), T0(b7, 2), { attack: 0.2, open: () => 2300 });
-pad(CH.C.pad, T0(b7, 2), CUT2, { attack: 0.15, release: 0.01, open: ramp(2200, 3600) });
-arp(CH.Gm, b7, 0, 2, { vel: () => 0.5 });
-arp(CH.C, b7, 2, (CUT2 - T0(b7, 2)) / BEAT, { step: 0.25, vel: ramp(0.5, 0.62) });
-bass(CH.Gm.root, T0(b7, 0), D(1.9), 0.75); bass(CH.C.root, T0(b7, 2), CUT2 - T0(b7, 2) - 0.01, 0.7);
-grooveA(b7, 0, 2);
-for (let b = 2; b < 3; b += 0.125) shaker(T0(b7, b), 0.3 + 0.5 * (b - 2));
-riser(T0(b7, 1.5), CUT2, 48, 0.9);
+// Appending: Gm9, then another gentle swell that Enter cuts off.
+pad(CH.Gm.pad, T0(b7, 0), T0(b7, 2), { attack: 0.4, open: () => 1500 });
+pad(CH.C.pad, T0(b7, 2), CUT2, { attack: 0.3, release: 0.01, open: ramp(1500, 2100) });
+arp(CH.Gm, b7, 0, 2, { step: 1, vel: () => 0.36 });
+arp(CH.C, b7, 2, (CUT2 - T0(b7, 2)) / BEAT, { vel: ramp(0.36, 0.44) });
+bass(CH.Gm.root, T0(b7, 0), D(1.9), 0.4); bass(CH.C.root, T0(b7, 2), CUT2 - T0(b7, 2) - 0.01, 0.42);
+riser(T0(b7, 1.5), CUT2, 48, 0.4);
 
-// Caesura, then the full drop on the downbeat: I – vi IV – ii V, with a vibraphone hook.
-const drop2 = T0(bar2, 0);
-boom(drop2, 0.19);
-const full = [[CH.F, CH.F], [CH.Dm, CH.Bb], [CH.Gm, CH.C]] as const;
-full.forEach(([a, b], k) => {
+// Caesura, then a calm close on the downbeat: I – vi IV – ii V, eighth-note mallets and the vibraphone melody.
+const calm = [[CH.F, CH.F], [CH.Dm, CH.Bb], [CH.Gm, CH.C]] as const;
+calm.forEach(([a, b], k) => {
   const bar = bar2 + k;
-  pad(a.pad, T0(bar, 0), T0(bar, 2), { attack: 0.08, open: () => 2700 });
-  pad(b.pad, T0(bar, 2), T0(bar + 1, 0), { attack: 0.08, open: () => 2700 });
-  arp(a, bar, 0, 2, { step: 0.25, vel: () => 0.42, echo: 0.25 }); arp(b, bar, 2, 2, { step: 0.25, vel: () => 0.42, echo: 0.25 });
-  for (const [c, beat] of [[a, 0], [b, 2]] as const) {
-    bass(c.root, T0(bar, beat), D(0.9), 0.8); bass(c.root, T0(bar, beat + 1), D(0.4), 0.65); bass(c.root + 12, T0(bar, beat + 1.5), D(0.4), 0.5);
-  }
-  grooveB(bar, bar === b10 ? 2 : 4);
+  pad(a.pad, T0(bar, 0), T0(bar, 2), { attack: 0.3, open: () => 1700 });
+  pad(b.pad, T0(bar, 2), T0(bar + 1, 0), { attack: 0.3, open: () => 1700 });
+  arp(a, bar, 0, 2, { vel: () => 0.32, echo: 0.3 }); arp(b, bar, 2, 2, { vel: () => 0.32, echo: 0.3 });
+  bass(a.root, T0(bar, 0), D(1.9), 0.42); bass(b.root, T0(bar, 2), D(1.9), 0.42);
 });
 const HOOK: [number, number, number, number][] = [
-  [bar2, 0, 69, 0.5], [bar2, 0.5, 72, 0.45], [bar2, 1, 76, 0.55], [bar2, 2.5, 74, 0.45], [bar2, 3, 72, 0.5],
-  [bar2 + 1, 0, 74, 0.5], [bar2 + 1, 1, 72, 0.45], [bar2 + 1, 1.5, 69, 0.45], [bar2 + 1, 2, 72, 0.55],
-  [b10, 0, 70, 0.5], [b10, 1, 72, 0.5], [b10, 2, 74, 0.5], [b10, 3, 76, 0.55],
+  [bar2, 0, 69, 0.4], [bar2, 0.5, 72, 0.36], [bar2, 1, 76, 0.42], [bar2, 2.5, 74, 0.36], [bar2, 3, 72, 0.38],
+  [bar2 + 1, 0, 74, 0.38], [bar2 + 1, 1, 72, 0.36], [bar2 + 1, 1.5, 69, 0.36], [bar2 + 1, 2, 72, 0.4],
+  [b10, 0, 70, 0.38], [b10, 1, 72, 0.38], [b10, 2, 74, 0.38], [b10, 3, 76, 0.4],
 ];
 for (const [bar, beat, m, vel] of HOOK) vibe(m, T0(bar, beat), vel, { dur: 1.8 });
-riser(T0(b10, 2), C.end, 48, 0.7);
+riser(T0(b10, 2), C.end, 48, 0.3);
 
-// The end card: the riser gives way to one chord with the ink, and the vibraphone answers as the name settles.
-boom(C.end, 0.13);
-pad(CH.F.pad, C.end, T.duration - 1.8, { attack: 0.3, release: 1.4, open: ramp(2200, 1100) });
-bass(CH.F.root, C.end, 2.4, 0.6);
-[53, 57, 60, 65, 69].forEach((m, k) => mallet(m, C.end + k * 0.09, 0.5 - k * 0.04, { echo: 0.35 }));
-vibe(77, C.end, 0.5, { dur: 3 });
-[69, 72, 76].forEach((m, k) => vibe(m, C.end + 0.8 + k * 0.16, 0.38 - k * 0.04, { dur: 3 }));
+// The end card: one soft chord with the ink, and the vibraphone answers as the name settles.
+pad(CH.F.pad, C.end, T.duration - 1.8, { attack: 0.4, release: 1.4, open: ramp(1700, 1000) });
+bass(CH.F.root, C.end, 2.4, 0.38);
+[53, 57, 60, 65, 69].forEach((m, k) => mallet(m, C.end + k * 0.09, 0.4 - k * 0.03, { echo: 0.35 }));
+vibe(77, C.end, 0.4, { dur: 3 });
+[69, 72, 76].forEach((m, k) => vibe(m, C.end + 0.8 + k * 0.16, 0.3 - k * 0.03, { dur: 3 }));
 
 // ------------------------------------------------------------------ tape rewind
 
@@ -682,22 +622,16 @@ for (const t of [CUT1, CUT2]) {
     gate[n] = Math.min(gate[n], g);
   }
 }
-// Pad, bass and mallets duck under each kick (fast dip, 160 ms recovery) so the groove breathes.
-const duck = new Float32Array(N).fill(1);
-for (const tk of KICKS) {
-  const i0 = Math.round(tk * SR);
-  for (let i = i0; i < Math.min(N, i0 + SR); i++) duck[i] = Math.min(duck[i], 1 - 0.35 * Math.exp(-(i - i0) / (0.16 * SR)));
-}
 const echoed = pingPong(bus.echoSend[0].map((x, n) => x * gate[n]), bus.echoSend[1].map((x, n) => x * gate[n]));
-const sendOf = (c: number) => bus.mainSend[c].map((x, n) => (x + bus.keysSend[c][n] * duck[n]) * gate[n] + bus.sfxSend[c][n] + echoed[c][n] * 0.3);
+const sendOf = (c: number) => bus.mainSend[c].map((x, n) => (x + bus.keysSend[c][n]) * gate[n] + bus.sfxSend[c][n] + echoed[c][n] * 0.3);
 const wet = freeverb(sendOf(0), sendOf(1));
 const mix = [0, 1].map((c) => {
   const hp = biquad('hp', 30), lp = biquad('lp', 12000, 0.6);
-  return bus.main[c].map((x, n) => run(lp, run(hp, (x + bus.keys[c][n] * duck[n]) * gate[n] + bus.sfx[c][n] + wet[c][n] * 1.2 + echoed[c][n] * 0.7)));
+  return bus.main[c].map((x, n) => run(lp, run(hp, (x + bus.keys[c][n]) * gate[n] + bus.sfx[c][n] + wet[c][n] * 1.2 + echoed[c][n] * 0.7)));
 });
 
 // Level: RMS to TARGET_RMS dBFS, soft knee above 0.7, peak at -1 dBFS; short fade at both ends.
-const TARGET_RMS = -18;
+const TARGET_RMS = -21;
 let sum = 0;
 for (let n = 0; n < N; n++) sum += (mix[0][n] ** 2 + mix[1][n] ** 2) / 2;
 const scale = 10 ** (TARGET_RMS / 20) / Math.sqrt(sum / N);
