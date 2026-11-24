@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { Tooltip, writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Tooltip, writeClipboard, type TooltipSide } from '@deepseek-ai/dsh-client-ui-primitives'
 // Built from @deepseek-ai/dsh-client-ui-chat 0.2.2-rc.5, src/client/chat. MIT, docs/dsh-ui-MIT.txt.
 import { formatMessageClock, type ClockTranslate } from '@deepseek-ai/dsh-client-ui-chat/src/client/chat/message-chrome.ts'
 import { useCalendarDay } from '@deepseek-ai/dsh-client-ui-chat/src/client/chat/use-calendar-day.ts'
@@ -84,14 +84,15 @@ export function RestIcon({ size }: { size: number }) {
   </svg>
 }
 
-export function NoteAction({ label, unavailableReason, onClick, children }: {
+export function NoteAction({ label, unavailableReason, tooltipSide, onClick, children }: {
   label: string
   unavailableReason?: string
+  tooltipSide: TooltipSide
   onClick: () => void
   children: ReactNode
 }) {
   const unavailable = unavailableReason !== undefined
-  return <Tooltip label={unavailableReason ?? label} side="bottom" openOnClick={unavailable}>
+  return <Tooltip label={unavailableReason ?? label} side={tooltipSide} openOnClick={unavailable}>
     <button type="button" className={action} aria-label={label} aria-disabled={unavailable || undefined}
       aria-description={unavailableReason} data-unavailable={unavailable || undefined}
       onClick={unavailable ? undefined : onClick}>{children}</button>

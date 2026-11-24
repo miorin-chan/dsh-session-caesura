@@ -148,6 +148,9 @@ function NoteCard({ text, t, canSend, time, onRewind, onSend }: {
   const { status, copy } = useNoteCopy(text)
   const [rewindFailed, setRewindFailed] = useState(false)
   const hint = canSend ? undefined : t('emptyDraft')
+  const hasError = status === 'copyFailed' || rewindFailed
+  // Keep tooltips clear of visible error feedback below the toolbar.
+  const tooltipSide = hasError ? 'top' : 'bottom'
   return (
     <section className={`${userRow} dsh-cn-note`} data-dsh-session-caesura aria-label={t('title')}>
       <div className={`${referenceSummary} dsh-cn-title`}><RestIcon size={15} />{t('title')}</div>
@@ -155,17 +158,17 @@ function NoteCard({ text, t, canSend, time, onRewind, onSend }: {
       <div className={userStack}><UserMessageBubble>{text}</UserMessageBubble></div>
       <div className={`${actions} dsh-cn-actions`} data-clock="start">
         {time}
-        <NoteAction label={t(status === 'copied' ? 'copied' : 'copy')} onClick={() => { void copy() }}>
+        <NoteAction label={t(status === 'copied' ? 'copied' : 'copy')} tooltipSide={tooltipSide} onClick={() => { void copy() }}>
           {status === 'copied' ? <IconCheckOutlineRegular /> : <IconCopyOutlineRegular />}
         </NoteAction>
-        <NoteAction label={t('rewind')} unavailableReason={hint} onClick={() => {
+        <NoteAction label={t('rewind')} unavailableReason={hint} tooltipSide={tooltipSide} onClick={() => {
           try { onRewind() } catch { setRewindFailed(true) }
         }}><IconEditOutlineRegular /></NoteAction>
-        <NoteAction label={t('send')} unavailableReason={hint} onClick={onSend}>
+        <NoteAction label={t('send')} unavailableReason={hint} tooltipSide={tooltipSide} onClick={onSend}>
           <IconSendOutlineRegular />
         </NoteAction>
       </div>
-      <span className={status === 'copyFailed' || rewindFailed ? 'dsh-cn-status' : visuallyHidden} role="status">
+      <span className={hasError ? 'dsh-cn-status' : visuallyHidden} role="status">
         {rewindFailed ? t('rewindFailed') : status === 'ready' ? '' : t(status)}
       </span>
     </section>
