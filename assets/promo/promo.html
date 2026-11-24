@@ -14,7 +14,7 @@
   The cue sheet below is shared: soundtrack.mts reads the same JSON to place music and UI sounds.
   All times are absolute seconds on the film's clock; one bar is 2.5 s at 96 BPM.
   Pairs are [start, end]; `logo` is [ink start, ink end, fade start, fade end]. `rewind` replays the sent branch backwards, from `rewindFrom` to `rewindTo`.
-  `save1` and `save2` fall on beats: the music halts on a fermata and breaks off there for one beat.
+  `save1` (click the rest) and `save2` (Enter appends) fall on beats: the music halts on a fermata and breaks off there.
 -->
 <script>window.__T = null; /*FRAME_T*/</script>
 <script id="timeline" type="application/json">
@@ -51,8 +51,8 @@
   "store": [13.8, 16.8],
 
   "appendKeys": [17.75, 17.8, 17.86, 17.93, 18, 18.07, 18.12, 18.21, 18.26, 18.32, 18.39],
-  "saveKeys": [18.6, 19.9],
-  "mod2": [18.8, 19.6],
+  "restCall": [17.6, 18.8],
+  "appendEnter": [18.85, 19.9],
   "save2": 19.375,
   "fly2": [19.42, 19.9],
   "append": 19.85,
@@ -84,41 +84,43 @@
   --serif-en: "Bodoni 72", "Didot", serif;
   --accent: #6575de;
 
-  /* DSH light theme tokens (design-platform.css, 0.2.2) */
-  --bg: #ffffff; --tb: #f9fafb; --tb-line: rgba(0, 0, 0, .07); --layer1: #ffffff;
-  --l1: rgb(15, 17, 21); --l2: rgb(97, 102, 107); --l3: rgb(129, 133, 140); --cap: rgb(173, 178, 184);
-  --b1: rgba(0, 0, 0, .06); --b2: rgba(0, 0, 0, .10); --b4: rgba(0, 0, 0, .14);
-  --brand: rgb(65, 118, 230); --bubble: rgb(237, 243, 254); --input: #ffffff;
-  --hover: rgba(38, 49, 72, .06); --selector: rgb(245, 246, 247); --code-bg: rgba(38, 49, 72, .06);
-  --send: rgb(65, 118, 230); --send-off: rgb(222, 225, 230); --ring: rgba(0, 0, 0, .07); --shadow-a: rgba(15, 23, 42, .14);
+  /* DSH dark theme tokens (design-platform.css, 0.2.2) */
+  --bg: #151517; --tb: #1c1c1e; --tb-line: rgba(255, 255, 255, .07); --layer1: #232324;
+  --l1: rgb(249, 250, 251); --l2: rgb(207, 211, 214); --l3: rgb(173, 178, 184); --cap: rgb(129, 133, 140);
+  --b1: rgba(255, 255, 255, .08); --b2: rgba(255, 255, 255, .12); --b4: rgba(255, 255, 255, .18);
+  --brand: rgb(122, 170, 255); --bubble: rgb(44, 44, 46); --input: rgb(44, 44, 46);
+  --hover: rgba(255, 255, 255, .08); --selector: rgb(53, 54, 56); --code-bg: rgba(255, 255, 255, .08);
+  --send: rgb(122, 170, 255); --send-off: rgb(70, 70, 74); --ring: rgba(255, 255, 255, .08); --shadow-a: rgba(0, 0, 0, .45);
+  /* Stage around the window */
+  --stage: #0d0e13; --ink-hi: #eef0f5; --ink-lo: #9aa1ad; --ink-faint: #6b7180;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
-html, body { width: 960px; height: 540px; overflow: hidden; background: #f3f4f8; }
-body { font-family: var(--sans); color: #15181d; -webkit-font-smoothing: antialiased; }
+html, body { width: 960px; height: 540px; overflow: hidden; background: var(--stage); }
+body { font-family: var(--sans); color: var(--ink-hi); -webkit-font-smoothing: antialiased; }
 svg { display: block; }
 
 #scene {
   position: relative; width: 960px; height: 540px; overflow: hidden;
   background:
-    radial-gradient(560px 380px at 6% 0%, rgba(101, 117, 222, .10), transparent 70%),
-    radial-gradient(560px 400px at 96% 100%, rgba(120, 160, 235, .10), transparent 70%),
-    #f3f4f8;
+    radial-gradient(620px 420px at 8% -4%, rgba(101, 117, 222, .16), transparent 70%),
+    radial-gradient(600px 420px at 96% 104%, rgba(196, 160, 100, .08), transparent 70%),
+    var(--stage);
 }
 
 /* Captions: one line per beat of the story, above the window */
 .cap { position: absolute; left: 50%; top: 16px; transform: translateX(-50%); display: flex; align-items: center; gap: 12px; white-space: nowrap; opacity: 0; }
 .cap-num { flex: none; padding: 4px 6px; border-radius: 6px; background: var(--accent); color: #fff; font: 600 11px/1 var(--mono); letter-spacing: .5px; }
-.cap-main { display: flex; align-items: center; gap: 2px; font-size: 17px; font-weight: 600; line-height: 24px; letter-spacing: .2px; color: #15181d; }
+.cap-main { display: flex; align-items: center; gap: 2px; font-size: 17px; font-weight: 600; line-height: 24px; letter-spacing: .2px; color: var(--ink-hi); }
 .cap-main.solo, .cap-sub.solo { justify-content: center; }
-.cap-sub { display: flex; align-items: center; gap: 4px; margin-top: 2px; font-size: 12.5px; line-height: 18px; color: #5d636b; }
+.cap-sub { display: flex; align-items: center; gap: 4px; margin-top: 2px; font-size: 12.5px; line-height: 18px; color: var(--ink-lo); }
 .cap svg { display: inline-block; flex: none; }
-#rwChip { position: absolute; left: 50%; top: 26px; display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 14px 0 11px; border-radius: 15px; background: rgba(20, 23, 28, .86); color: #fff; font-size: 13px; letter-spacing: 1px; opacity: 0; }
+#rwChip { position: absolute; left: 50%; top: 26px; display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 14px 0 11px; border-radius: 15px; background: rgba(255, 255, 255, .12); box-shadow: inset 0 0 0 .5px rgba(255, 255, 255, .16); color: var(--ink-hi); font-size: 13px; letter-spacing: 1px; opacity: 0; }
 
 /* App window */
 #win {
   position: absolute; left: 90px; top: 72px; width: 780px; height: 456px;
   border-radius: 12px; overflow: hidden; background: var(--bg); color: var(--l1);
-  box-shadow: 0 0 0 .5px rgba(17, 24, 39, .12), 0 26px 60px -18px rgba(30, 41, 80, .30), 0 6px 16px -8px rgba(30, 41, 80, .14);
+  box-shadow: 0 0 0 .5px rgba(255, 255, 255, .10), 0 30px 70px -18px rgba(0, 0, 0, .75), 0 8px 20px -8px rgba(0, 0, 0, .5);
 }
 .tb { position: relative; height: 32px; display: flex; align-items: center; gap: 8px; padding-left: 13px; background: var(--tb); border-bottom: .5px solid var(--tb-line); }
 .tb i { width: 11px; height: 11px; border-radius: 50%; }
@@ -127,7 +129,7 @@ svg { display: block; }
 #cam { position: absolute; left: 0; top: 0; width: 780px; height: 424px; transform-origin: 0 0; }
 #chat { position: absolute; left: 0; top: 0; width: 780px; overflow: hidden; }
 #col { position: absolute; left: 110px; width: 560px; }
-#tape { position: absolute; inset: 32px 0 0; pointer-events: none; opacity: 0; background: repeating-linear-gradient(0deg, rgba(40, 48, 80, .10) 0 1px, transparent 1px 7px); }
+#tape { position: absolute; inset: 32px 0 0; pointer-events: none; opacity: 0; background: repeating-linear-gradient(0deg, rgba(220, 225, 255, .07) 0 1px, transparent 1px 7px); }
 
 /* Flow items: .w animates presence, .in carries the gap above */
 .w { overflow: hidden; }
@@ -150,6 +152,8 @@ svg { display: block; }
 .cn-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 2px; }
 .cn-btn { position: relative; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; color: var(--l3); }
 .cn-btn svg { position: absolute; }
+.cn-btn i { display: contents; }
+.cn-time { margin-right: 2px; font-size: 12px; line-height: 28px; color: var(--l3); }
 .fill { border-radius: 3px; }
 
 /* Composer (DSH InputBar card; primary action 34×34 at right 8 / bottom 8) */
@@ -164,15 +168,15 @@ svg { display: block; }
 #rest { position: absolute; right: 8px; bottom: 8px; display: grid; place-items: center; width: 34px; height: 34px; border: 1px solid var(--b4); border-radius: 50%; background: var(--input); color: var(--l2); opacity: 0; }
 
 /* Overlays inside the camera layer */
-.callout { position: absolute; left: 0; top: 0; padding: 4px 9px; border-radius: 6px; background: rgba(20, 23, 28, .92); color: #fff; font-size: 11px; line-height: 16px; white-space: nowrap; opacity: 0; }
+.callout { position: absolute; left: 0; top: 0; padding: 4px 9px; border-radius: 6px; background: rgba(238, 240, 246, .96); color: #15181d; font-size: 11px; line-height: 16px; white-space: nowrap; opacity: 0; }
 .callout::before { content: ""; position: absolute; width: 8px; height: 8px; background: inherit; transform: rotate(45deg); }
 .callout.right::before { right: -3px; top: calc(50% - 4px); }
-#tip { position: absolute; left: 0; top: 0; padding: 3px 7px; border: .5px solid rgba(0, 0, 0, .18); border-radius: 5px; background: #f6f6f6; color: #222; font-size: 11px; line-height: 15px; white-space: nowrap; box-shadow: 0 3px 10px rgba(0, 0, 0, .14); opacity: 0; }
+#tip { position: absolute; left: 0; top: 0; padding: 3px 7px; border: .5px solid rgba(255, 255, 255, .16); border-radius: 5px; background: #2a2a2d; color: #e8e8ea; font-size: 11px; line-height: 15px; white-space: nowrap; box-shadow: 0 3px 10px rgba(0, 0, 0, .14); opacity: 0; }
 #keys { position: absolute; left: 0; top: 0; display: flex; align-items: center; gap: 6px; opacity: 0; }
-.kbd { display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 9px; border: .5px solid rgba(0, 0, 0, .16); border-radius: 7px; background: #fff; color: #2b2f36; font-size: 12px; font-weight: 500; box-shadow: 0 2px 0 rgba(0, 0, 0, .14), 0 8px 16px -8px rgba(0, 0, 0, .25); }
+.kbd { display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 9px; border: .5px solid rgba(255, 255, 255, .16); border-radius: 7px; background: #36363b; color: #e9ebef; font-size: 12px; font-weight: 500; box-shadow: 0 2px 0 rgba(0, 0, 0, .55), 0 8px 16px -8px rgba(0, 0, 0, .6); }
 .kplus { color: #8a9099; font-size: 12px; }
-#ghost { position: absolute; left: 0; top: 0; max-width: 300px; overflow: hidden; padding: 6px 12px; border-radius: 12px; background: var(--bubble); color: var(--l1); font-size: 13px; line-height: 20px; white-space: nowrap; text-overflow: ellipsis; box-shadow: 0 8px 22px -6px rgba(101, 117, 222, .40); opacity: 0; }
-.ripple { position: absolute; left: 0; top: 0; width: 44px; height: 44px; margin: -22px 0 0 -22px; border-radius: 50%; background: rgba(101, 117, 222, .28); opacity: 0; }
+#ghost { position: absolute; left: 0; top: 0; max-width: 300px; overflow: hidden; padding: 6px 12px; border-radius: 12px; background: var(--bubble); color: var(--l1); font-size: 13px; line-height: 20px; white-space: nowrap; text-overflow: ellipsis; box-shadow: 0 0 0 .5px rgba(255, 255, 255, .10), 0 8px 22px -6px rgba(101, 117, 222, .55); opacity: 0; }
+.ripple { position: absolute; left: 0; top: 0; width: 44px; height: 44px; margin: -22px 0 0 -22px; border-radius: 50%; background: rgba(140, 152, 245, .35); opacity: 0; }
 #cursor { position: absolute; left: 0; top: 0; width: 20px; height: 24px; opacity: 0; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, .25)); transform-origin: 2px 1.5px; }
 
 /* Logo and end card */
@@ -181,12 +185,12 @@ svg { display: block; }
 #end { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
 #end > * { opacity: 0; }
 .e-rest { width: 66px; height: 158px; }
-.e-name { display: flex; align-items: baseline; gap: 18px; margin-top: 34px; color: #23262d; }
+.e-name { display: flex; align-items: baseline; gap: 18px; margin-top: 34px; color: var(--ink-hi); }
 .e-name .zh { font-family: var(--serif-zh); font-weight: 300; font-size: 40px; letter-spacing: 8px; margin-right: -8px; }
-.e-name .dot { align-self: center; width: 5px; height: 5px; margin-top: 6px; border-radius: 50%; background: #a4aab4; }
+.e-name .dot { align-self: center; width: 5px; height: 5px; margin-top: 6px; border-radius: 50%; background: var(--ink-faint); }
 .e-name .en { font-family: var(--serif-en); font-style: italic; font-size: 44px; letter-spacing: .5px; }
-.e-host { margin-top: 30px; font-size: 14px; letter-spacing: 2px; color: #6b717c; }
-.e-pkg { margin-top: 8px; font: 12px/1.4 var(--mono); color: #a4aab4; letter-spacing: .3px; }
+.e-host { margin-top: 30px; font-size: 14px; letter-spacing: 2px; color: var(--ink-lo); }
+.e-pkg { margin-top: 8px; font: 12px/1.4 var(--mono); color: var(--ink-faint); letter-spacing: .3px; }
 </style>
 </head>
 <body>
@@ -215,7 +219,8 @@ svg { display: block; }
               <div class="cn-title" id="ntTitle"><span data-glyph="rest" data-size="15"></span>结语笔记</div>
               <div class="cn-bubble" id="bubble"></div>
               <div class="cn-actions">
-                <span class="cn-btn" id="bCopy"><span data-glyph="copy"></span><span data-glyph="check"></span></span>
+                <span class="cn-time" id="ntTime"></span>
+                <span class="cn-btn" id="bCopy"><i data-icon="copyAct"></i><span data-glyph="check"></span></span>
                 <span class="cn-btn" id="bRewind"><span data-glyph="rewind"></span></span>
                 <span class="cn-btn" id="bSend"><span data-glyph="send"></span></span>
               </div>
@@ -244,6 +249,7 @@ svg { display: block; }
         </div>
 
         <div class="callout right" id="callStore">只存在当前浏览器</div>
+        <div class="callout right" id="callRest">已有结语：休止符常驻，Enter 即追加</div>
         <div id="tip"></div>
         <div id="keys"><span class="kbd" id="kMod">⌘ Command</span><span class="kplus" id="kPlus">+</span><span class="kbd" id="kEnter">Enter ↵</span></div>
         <div id="ghost"></div>
@@ -302,7 +308,7 @@ svg { display: block; }
   /** The rest glyph with a soft ink edge that moves top to bottom (see `ink`). */
   for (const svg of document.querySelectorAll('[data-ink]')) {
     const id = svg.dataset.ink;
-    svg.innerHTML = `<defs><linearGradient id="${id}Fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8190ec"/><stop offset="1" stop-color="#5463d2"/></linearGradient>
+    svg.innerHTML = `<defs><linearGradient id="${id}Fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#aab4fa"/><stop offset="1" stop-color="#6d7be6"/></linearGradient>
       <linearGradient id="${id}Fade" gradientUnits="userSpaceOnUse" x1="0" x2="0" y1="0" y2="3"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#000"/></linearGradient>
       <mask id="${id}Ink" maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24"><rect x="0" y="0" width="24" height="24" fill="url(#${id}Fade)"/></mask></defs>
       <path fill="url(#${id}Fill)" mask="url(#${id}Ink)" d="${REST_D}"/>`;
@@ -328,7 +334,7 @@ svg { display: block; }
     [null, '可一发出去，又开了一轮', '模型还会接话，上下文也多了一段'],
     ['01', `按住 ⌘，发送键变成休止符${rest(22)}`, '松开即恢复 · Windows / Linux 上是 Ctrl'],
     ['02', '点一下：存为结语笔记', '不发给模型，也不开新一轮'],
-    ['03', '再存一次，接在后面', '⌘ Enter 同样保存 · 两段之间空一行'],
+    ['03', '有了结语，按 Enter 就是追加', '新段空一行接在后面，保存时间一并更新'],
     ['04', '复制、回退，或者发送', '回退：移回输入框接着改 · 发送：作为普通消息发出'],
   ];
   const capRoot = $('captions');
@@ -347,7 +353,7 @@ svg { display: block; }
   const IN = (id) => W[id].firstElementChild;
   const composer = $('composer'), draft = $('draft'), send = $('send'), restBtn = $('rest');
   const bubble = $('bubble'), ntTitle = $('ntTitle'), bCopy = $('bCopy'), bRewind = $('bRewind'), bSend = $('bSend');
-  const callStore = $('callStore'), tip = $('tip'), keys = $('keys'), kMod = $('kMod'), kPlus = $('kPlus'), kEnter = $('kEnter');
+  const callStore = $('callStore'), callRest = $('callRest'), ntTime = $('ntTime'), tip = $('tip'), keys = $('keys'), kMod = $('kMod'), kPlus = $('kPlus'), kEnter = $('kEnter');
   const ghost = $('ghost'), ripple = $('ripple'), cursor = $('cursor'), rwChip = $('rwChip'), tape = $('tape');
   const winEl = $('win'), endEl = $('end');
   const [copyIco, checkIco] = bCopy.querySelectorAll('svg');
@@ -381,7 +387,8 @@ svg { display: block; }
   }
   const lengthOf = (parts) => parts.reduce((n, [s]) => n + s.length, 0);
   const typed = (t, times, text) => [...text].slice(0, times.filter((x) => t >= x).length).join('');
-  const hlAt = (t, at) => 0.16 * (1 - seg(t, at + 0.25, at + 1.0));
+  const HL = '127,140,240';
+  const hlAt = (t, at) => 0.3 * (1 - seg(t, at + 0.25, at + 1.0));
 
   /** Branch clock: the sent turn plays forward, then rewinds to just before Enter and stays there. */
   function branchT(t) {
@@ -414,7 +421,7 @@ svg { display: block; }
       draft.innerHTML = `${caret}<span class="ph">发消息或创建任务, / 调用指令, @ 文件或对话</span>`;
     } else {
       draft.innerHTML = segs.map((s) => (s.hl
-        ? `<span class="fill" style="background:rgba(101,117,222,${s.hl.toFixed(3)})">${esc(s.s)}</span>`
+        ? `<span class="fill" style="background:rgba(${HL},${s.hl.toFixed(3)})">${esc(s.s)}</span>`
         : esc(s.s))).join('') + caret;
     }
     return segs.length > 0;
@@ -456,7 +463,9 @@ svg { display: block; }
     return { ...pos, op };
   }
 
-  const modHeld = (t) => [...C.mod, C.mod2].some((r) => within(t, r));
+  const modHeld = (t) => C.mod.some((r) => within(t, r));
+  /** The note exists from the first save until Rewind moves it back into the composer. */
+  const noteExists = (t) => t >= C.save1 && t < C.rewindNote;
 
   // ---------------------------------------------------------------- frame
   function renderScene(t) {
@@ -504,9 +513,12 @@ svg { display: block; }
     const appended = t >= C.append;
     const hl = hlAt(t, C.append);
     bubble.innerHTML = appended
-      ? `${esc(NOTE1)}\n\n<span class="fill" style="background:rgba(101,117,222,${hl.toFixed(3)})">${esc(NOTE2)}</span>`
+      ? `${esc(NOTE1)}\n\n<span class="fill" style="background:rgba(${HL},${hl.toFixed(3)})">${esc(NOTE2)}</span>`
       : esc(NOTE1);
     present(W.nt, out3(seg(t, ...C.note1)) * (1 - inOut3(seg(t, ...C.noteOut))));
+    // Saved time beside the actions; appending updates it.
+    ntTime.textContent = appended ? '14:35' : '14:33';
+    ntTime.style.color = appended && t < C.append + 1.2 ? `color-mix(in srgb, var(--brand) ${(100 * (1 - seg(t, C.append + 0.2, C.append + 1.2))).toFixed(1)}%, var(--l3))` : '';
     const copied = within(t, [C.copy, C.copy + 1.2]);
     copyIco.style.opacity = copied ? '0' : '1';
     checkIco.style.opacity = copied ? '1' : '0';
@@ -520,11 +532,14 @@ svg { display: block; }
     col.style.top = `${Math.min(18, chatH - col.offsetHeight - 6).toFixed(2)}px`;
 
     // 6. Send arrow and the rest overlay.
-    const showRest = t >= C.rewind[1] && hasText && modHeld(t);
+    // First note: the rest shows while Mod is held. Once a note exists it stays on the send button,
+    // disabled while the composer is empty, and Enter appends.
+    const showRest = t >= C.rewind[1] && (noteExists(t) || (hasText && modHeld(t)));
     restBtn.style.opacity = showRest ? '1' : '0';
+    restBtn.style.color = hasText ? 'var(--l2)' : 'var(--l3)';
     send.style.background = hasText ? 'var(--send)' : 'var(--send-off)';
     send.style.transform = `scale(${(1 - 0.1 * bell(seg(tb, C.enter, C.enter + 0.14))).toFixed(3)})`;
-    restBtn.style.transform = `scale(${(1 - 0.1 * bell(seg(t, C.save1, C.save1 + 0.14))).toFixed(3)})`;
+    restBtn.style.transform = `scale(${(1 - 0.1 * Math.max(bell(seg(t, C.save1, C.save1 + 0.14)), bell(seg(t, C.save2, C.save2 + 0.14)))).toFixed(3)})`;
 
     // 7. Measure.
     const B = {
@@ -546,12 +561,15 @@ svg { display: block; }
       el.style.background = over(b) ? 'var(--hover)' : 'transparent';
       el.style.color = over(b) ? 'var(--l1)' : '';
     }
-    restBtn.style.color = over(B.rest) ? 'var(--l1)' : '';
+    if (over(B.rest)) restBtn.style.color = 'var(--l1)';
 
     // 9. Callout and the native tooltip.
     const sp = out3(seg(t, C.store[0], C.store[0] + 0.3)) * (1 - seg(t, C.store[1] - 0.3, C.store[1]));
     callStore.style.opacity = sp.toFixed(3);
     callStore.style.transform = `translate(${(B.title.x - callStore.offsetWidth - 10 - (1 - sp) * 4).toFixed(2)}px, ${(B.title.cy - callStore.offsetHeight / 2).toFixed(2)}px)`;
+    const rp2 = out3(seg(t, C.restCall[0], C.restCall[0] + 0.3)) * (1 - seg(t, C.restCall[1] - 0.3, C.restCall[1]));
+    callRest.style.opacity = rp2.toFixed(3);
+    callRest.style.transform = `translate(${(B.rest.x - callRest.offsetWidth - 10 - (1 - rp2) * 4).toFixed(2)}px, ${(B.rest.cy - callRest.offsetHeight / 2).toFixed(2)}px)`;
     tip.textContent = '发送';
     tip.style.opacity = within(t, C.tipSend) ? '1' : '0';
     tip.style.transform = `translate(${(P.x - tip.offsetWidth / 2).toFixed(2)}px, ${(P.y + 22).toFixed(2)}px)`;
@@ -564,7 +582,7 @@ svg { display: block; }
     };
     if (t < C.rewind[1]) showKeys(C.enterKeys, 'enter', tb);
     showKeys(C.modKeys, 'mod');
-    showKeys(C.saveKeys, 'both');
+    showKeys(C.appendEnter, 'enter');
     keys.style.opacity = kp.toFixed(3);
     kMod.style.display = set === 'enter' ? 'none' : '';
     kPlus.style.display = set === 'both' ? '' : 'none';
@@ -573,7 +591,7 @@ svg { display: block; }
     const down = (el, on) => {
       el.style.transform = on ? 'translateY(1.5px)' : 'none';
       el.style.boxShadow = on ? '0 .5px 0 rgba(0,0,0,.14)' : '';
-      el.style.background = on ? '#eef0fc' : '#fff';
+      el.style.background = on ? '#454b6e' : '#36363b';
     };
     down(kMod, modHeld(t));
     down(kEnter, within(t < C.rewind[1] ? tb : -1, [C.enter, C.enter + 0.14]) || within(t, [C.save2, C.save2 + 0.14]));
