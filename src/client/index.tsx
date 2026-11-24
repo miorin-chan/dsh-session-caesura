@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, useSyncExternalStore, type ReactNode } from 'react'
 // DSH 0.2.2-rc.5 shares these exports from @deepseek-ai/dsh-client-ui-primitives src/index.ts.
 import {
-  IconCheckOutlineRegular, IconCopyOutlineRegular, IconEditOutlineRegular, IconSendOutlineRegular, UserMessageBubble,
+  IconCheckOutlineRegular, IconCopyOutlineRegular, IconSendOutlineRegular, UserMessageBubble,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 // @deepseek-ai/dsh-client-ui-chat 0.2.2-rc.5, src/client/chat. MIT, docs/dsh-ui-MIT.txt.
 import { referenceSummary, userRow, userStack } from '@deepseek-ai/dsh-client-ui-chat/src/client/chat/MessageItem.module.css'
@@ -16,7 +16,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { canSaveDraft, canSendNote, createNoteStore, readNote, restoreNote, saveDraftAsNote, submitNote } from '../lib/notes.js'
 import type { ClosingNote } from '../lib/notes.js'
-import { NoteAction, NoteTime, RestIcon, styles, useNoteCopy } from './appearance.js'
+import { NoteAction, NoteTime, RestIcon, UndoIcon, styles, useNoteCopy } from './appearance.js'
 import { ComposerKeyboardFrame, primaryModifier, useComposerSaveAnchor } from './keyboard.js'
 import { labels } from './labels.js'
 
@@ -163,7 +163,7 @@ function NoteCard({ text, t, canSend, time, onRewind, onSend }: {
         </NoteAction>
         <NoteAction label={t('rewind')} unavailableReason={hint} tooltipSide={tooltipSide} onClick={() => {
           try { onRewind() } catch { setRewindFailed(true) }
-        }}><IconEditOutlineRegular /></NoteAction>
+        }}><UndoIcon /></NoteAction>
         <NoteAction label={t('send')} unavailableReason={hint} tooltipSide={tooltipSide} onClick={onSend}>
           <IconSendOutlineRegular />
         </NoteAction>

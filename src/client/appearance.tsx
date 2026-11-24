@@ -84,6 +84,14 @@ export function RestIcon({ size }: { size: number }) {
   </svg>
 }
 
+export function UndoIcon() {
+  return <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"
+    fill="none" stroke="currentColor" strokeWidth={1.65} strokeLinecap="round" strokeLinejoin="round">
+    <path d="M4 10h11a5 5 0 0 1 0 10h-3" />
+    <path d="m9 5-5 5 5 5" />
+  </svg>
+}
+
 export function NoteAction({ label, unavailableReason, tooltipSide, onClick, children }: {
   label: string
   unavailableReason?: string

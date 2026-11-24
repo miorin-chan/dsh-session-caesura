@@ -9,7 +9,8 @@
 
 ## 结语笔记的原生样式
 
-气泡、Tooltip、剪贴板写入和操作图标使用 Web shell 提供的 `@deepseek-ai/dsh-client-ui-primitives`。
+气泡、Tooltip、剪贴板写入以及复制和发送图标使用 Web shell 提供的 `@deepseek-ai/dsh-client-ui-primitives`。
+回退按钮使用插件原来的撤销箭头，由原生操作栏样式控制尺寸和颜色。
 聊天布局、操作栏 CSS 和日期格式在构建时取自锁定版本的 `@deepseek-ai/dsh-client-ui-chat`。
 结语正文直接传入气泡，保留引用和追加段落之间的空行。
 

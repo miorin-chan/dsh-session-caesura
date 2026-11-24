@@ -57,7 +57,6 @@ test('registers localized slots, shows the rest while Mod is held and disposes i
       isDarwinDesktop: () => document.documentElement.dataset.platform === 'darwin',
       UserMessageBubble: () => null,
       IconCopyOutlineRegular: () => null,
-      IconEditOutlineRegular: () => null,
       IconSendOutlineRegular: () => null,
     }
     const plugin = registration.factory(id => {
@@ -170,9 +169,11 @@ test('registers localized slots, shows the rest while Mod is held and disposes i
     assert.equal(bubble.props.children, quoted.text)
     const [time, copy, rewind, send] = actions.props.children
     assert.equal(time.props.savedAt, quoted.savedAt)
-    assert.deepEqual([copy, rewind, send].map(button => button.props.children.type), [
-      publishedUi.IconCopyOutlineRegular, publishedUi.IconEditOutlineRegular, publishedUi.IconSendOutlineRegular,
-    ])
+    assert.equal(copy.props.children.type, publishedUi.IconCopyOutlineRegular)
+    assert.equal(send.props.children.type, publishedUi.IconSendOutlineRegular)
+    const undo = rewind.props.children.type()
+    assert.equal(undo.type, 'svg')
+    assert.deepEqual(undo.props.children.map(path => path.props.d), ['M4 10h11a5 5 0 0 1 0 10h-3', 'm9 5-5 5 5 5'])
     componentEffects.pop()?.()
 
     effects.reverse().forEach(dispose => dispose())
