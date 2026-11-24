@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useState, useSyncExternalStore, type ReactNode } from 'react'
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type { SessionSnapshot } from '@deepseek-ai/dsh-api-session-controller/client'
@@ -6,9 +6,10 @@ import type { InputState } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { ChatSnapshot } from '@deepseek-ai/dsh-client-ui-chat/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-ui-session/client'
-import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+import type { PropsLocale, PropsRenderFactories, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { canSaveDraft, canSendNote, createNoteStore, readNote, restoreNote, saveDraftAsNote, submitNote } from '../lib/notes.js'
-import { Icon, IconButton, styles, useNoteCopy } from './appearance.js'
+import type { ClosingNote } from '../lib/notes.js'
+import { Icon, IconButton, NoteTime, styles, useNoteCopy } from './appearance.js'
 import { ComposerKeyboardFrame, primaryModifier, useComposerSaveAnchor } from './keyboard.js'
 import { labels } from './labels.js'
 
@@ -26,7 +27,11 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 }
 
 type ComposerProps = PropsRuntime<typeof inputSlot> & PropsLocale<typeof namespace>
-type TailProps = PropsRuntime<typeof tailSlot> & PropsLocale<typeof namespace>
+type TailProps = PropsRuntime<typeof tailSlot> & PropsLocale<typeof namespace> & PropsRenderFactories
+
+async function loadNoteImage(): Promise<string> {
+  throw new Error('Closing notes contain only text')
+}
 
 export function apply(ctx: Context): void {
   ctx.effect(() => ctx.locale.register(namespace, labels), `${namespace}: locale`)
@@ -35,6 +40,7 @@ export function apply(ctx: Context): void {
     stylesheet.textContent = styles
     document.head.append(stylesheet)
     const notes = createNoteStore(() => window.localStorage, window)
+    const chatText = ctx.locale.bind('chat')
     const unregisterFrame = ctx.slots.inject(frameSlot, () => ctx.slots.register({
       name: frameSlot, id: namespace,
     }, ComposerKeyboardFrame))
@@ -83,25 +89,29 @@ export function apply(ctx: Context): void {
       )
     }
 
-    function NoteAtTurnEnd({ turn, sessionId, t, useInput, inputActions, useAccess, useSession }: TailProps) {
+    function NoteAtTurnEnd({ turn, sessionId, t, useInput, inputActions, useAccess, useSession, renderFactorySlot }: TailProps) {
       const subscribe = useCallback((listener: () => void) => notes.subscribe(sessionId, listener), [sessionId])
       const getSnapshot = useCallback(() => notes.read(sessionId), [sessionId])
       const note = readNote(useSyncExternalStore(subscribe, getSnapshot))
       if (note === null || turn.end?.seq !== note.endSeq) return null
       return <SendableNote key={note.text} note={note} t={t} useInput={useInput}
-        inputActions={inputActions} useAccess={useAccess} useSession={useSession}
+        inputActions={inputActions} useAccess={useAccess} useSession={useSession} renderFactorySlot={renderFactorySlot}
         remove={() => notes.remove(sessionId, note)} />
     }
 
-    function SendableNote({ note, t, useInput, inputActions, useAccess, useSession, remove }:
-      Pick<TailProps, 't' | 'useInput' | 'inputActions' | 'useAccess' | 'useSession'>
-      & { note: NonNullable<ReturnType<typeof readNote>>; remove: () => void }) {
+    function SendableNote({ note, t, useInput, inputActions, useAccess, useSession, renderFactorySlot, remove }:
+      Pick<TailProps, 't' | 'useInput' | 'inputActions' | 'useAccess' | 'useSession' | 'renderFactorySlot'>
+      & { note: ClosingNote; remove: () => void }) {
       const input = useInput((state: InputState) => state)
       const allowed = useAccess('session/prompt')
       const ready = useSession((state: SessionSnapshot) => state.openState === 'open' && !state.removed
         && state.pendingSubmissions.length === 0)
       const canSend = allowed && ready && canSendNote(input)
-      return <NoteCard note={note} t={t} canSend={canSend}
+      const body = renderFactorySlot('conversation.chat.user.content', {
+        content: { text: note.text, attachments: [], extraBlocks: [] }, facts: {}, loadImage: loadNoteImage,
+      })
+      return <NoteCard text={note.text} t={t} canSend={canSend} body={body}
+        time={note.savedAt !== undefined && <NoteTime savedAt={note.savedAt} t={chatText} />}
         onRewind={() => { if (canSend && restoreNote(input, note, inputActions)) remove() }}
         onSend={() => { if (canSend) submitNote(input, note, inputActions) }} />
     }
@@ -124,21 +134,24 @@ function useModHeld(): boolean {
   return held
 }
 
-function NoteCard({ note, t, canSend, onRewind, onSend }: {
-  note: NonNullable<ReturnType<typeof readNote>>
+function NoteCard({ text, t, canSend, body, time, onRewind, onSend }: {
+  text: string
   t: TailProps['t']
   canSend: boolean
+  body: ReactNode
+  time: ReactNode
   onRewind: () => void
   onSend: () => void
 }) {
-  const { status, copy } = useNoteCopy(note.text)
+  const { status, copy } = useNoteCopy(text)
   const [rewindFailed, setRewindFailed] = useState(false)
   const hint = canSend ? undefined : t('emptyDraft')
   return (
     <section className="dsh-cn-note" data-dsh-session-caesura aria-label={t('title')}>
       <div className="dsh-cn-title"><Icon name="rest" size={15} />{t('title')}</div>
-      <div className="dsh-cn-bubble">{note.text}</div>
+      {body}
       <div className="dsh-cn-actions">
+        {time}
         <IconButton label={t(status === 'copied' ? 'copied' : 'copy')} onClick={() => { void copy() }}>
           <Icon name={status === 'copied' ? 'check' : 'copy'} />
         </IconButton>

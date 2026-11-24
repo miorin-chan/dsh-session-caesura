@@ -2,6 +2,8 @@
 export interface ClosingNote {
   readonly endSeq: number
   readonly text: string
+  /** Browser clock at the last save, in Unix milliseconds. Legacy notes have no recorded time. */
+  readonly savedAt?: number
 }
 
 export interface InputDraft {
@@ -37,8 +39,12 @@ export function readNote(raw: string | null): ClosingNote | null {
     const value: unknown = JSON.parse(raw)
     if (typeof value !== 'object' || value === null || !('endSeq' in value) || !('text' in value)) return null
     const { endSeq, text } = value
-    return typeof endSeq === 'number' && Number.isSafeInteger(endSeq) && endSeq >= 0
-      && typeof text === 'string' && isNoteText(text) ? { endSeq, text } : null
+    if (typeof endSeq !== 'number' || !Number.isSafeInteger(endSeq) || endSeq < 0
+      || typeof text !== 'string' || !isNoteText(text)) return null
+    const savedAt = 'savedAt' in value ? value.savedAt : undefined
+    return typeof savedAt === 'number' && Number.isSafeInteger(savedAt) && !Number.isNaN(new Date(savedAt).getTime())
+      ? { endSeq, text, savedAt }
+      : { endSeq, text }
   } catch {
     return null
   }
@@ -103,14 +109,14 @@ export function createNoteStore(getStorage: () => Storage, events: Window) {
         const next = note.text.replace(/^(?:[^\S\r\n]*[\r\n])+/, '')
         text = `${previous}\n\n${next}`
       }
-      storage.setItem(key, JSON.stringify({ endSeq: note.endSeq, text }))
+      storage.setItem(key, JSON.stringify({ endSeq: note.endSeq, text, savedAt: Date.now() }))
       publish(key)
     },
     remove(sessionId: string, note: ClosingNote): void {
       const storage = getStorage()
       const key = prefix + sessionId
       const current = readNote(storage.getItem(key))
-      if (current?.endSeq !== note.endSeq || current.text !== note.text) return
+      if (current?.endSeq !== note.endSeq || current.text !== note.text || current.savedAt !== note.savedAt) return
       storage.removeItem(key)
       publish(key)
     },

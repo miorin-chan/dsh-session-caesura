@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import type { Translate } from '@deepseek-ai/dsh-client-ui-slots'
 
 export const styles = `
 /* The turnTail slot's display: contents anchor puts its entries in the footer's flex column.
@@ -9,21 +10,28 @@ export const styles = `
     & > [data-slot="conversation.chat.turnTail"] > .dsh-cn-note { order: 1; }
   }
 }
-.dsh-cn-note { display: flex; flex-direction: column; align-items: flex-end; margin-block: 8px; }
-.dsh-cn-bubble {
-  box-sizing: border-box;
-  max-width: min(calc(var(--dsh-chat-content-width, 748px) * 0.702), 82%);
-  background: var(--dsw-specific-bubble); border-radius: var(--dsw-radius-xl);
-  padding: 10px 16px; color: var(--dsw-alias-label-primary);
-  font-size: var(--dsh-content-font-size, 14px);
-  line-height: calc(22px + var(--dsh-content-font-delta, 0px));
-  white-space: pre-wrap; overflow-wrap: anywhere;
-}
+/* User row and clock styling follow @deepseek-ai/dsh-client-ui-chat 0.2.2-rc.5,
+   src/client/chat/MessageItem.module.css (.userRow) and MessageIconActions.module.css (.timeStart, .action).
+   Copyright (c) 2026 DeepSeek, MIT. See docs/dsh-ui-MIT.txt. */
+.dsh-cn-note { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; margin-block: 8px; }
 .dsh-cn-title {
-  display: flex; align-items: center; gap: 4px; margin-bottom: 3px;
+  display: flex; align-items: center; gap: 4px;
   color: var(--dsw-alias-label-secondary); font-size: var(--dsh-content-font-size-secondary, 13px);
 }
-.dsh-cn-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 2px; }
+.dsh-cn-actions {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; max-width: 100%;
+}
+.dsh-cn-time {
+  padding-inline-end: 12px;
+  font-size: var(--dsh-content-font-size-secondary, 13px);
+  line-height: calc(24px + var(--dsh-content-font-delta, 0px));
+  color: var(--dsw-alias-label-tertiary);
+  white-space: nowrap;
+}
+.dsh-cn-actions .dsh-cn-button svg {
+  width: calc(15px + var(--dsh-content-font-delta, 0px));
+  height: calc(15px + var(--dsh-content-font-delta, 0px));
+}
 .dsh-cn-button {
   box-sizing: border-box; display: inline-grid; place-items: center; flex: none;
   width: calc(28px + var(--dsh-content-font-delta, 0px)); height: calc(28px + var(--dsh-content-font-delta, 0px));
@@ -119,6 +127,37 @@ export function IconButton({ label, hint, unavailable = false, save = false, onC
     aria-description={hint} title={description}
     onMouseDown={save ? event => event.preventDefault() : undefined}
     onClick={() => { if (!unavailable) onClick() }}>{children}</button>
+}
+
+// Local calendar formatting follows formatMessageClock and useCalendarDay from
+// @deepseek-ai/dsh-client-ui-chat 0.2.2-rc.5, src/client/chat/{message-chrome,use-calendar-day}.ts.
+// Copyright (c) 2026 DeepSeek, MIT. See docs/dsh-ui-MIT.txt.
+export function NoteTime({ savedAt, t }: { savedAt: number; t: Translate<'clock.md' | 'clock.ymd'> }) {
+  const [now, setNow] = useState(Date.now)
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>
+    const update = () => {
+      const current = Date.now()
+      const midnight = new Date(current)
+      midnight.setHours(24, 0, 0, 0)
+      setNow(current)
+      timer = setTimeout(update, Math.max(1, midnight.getTime() - current))
+    }
+    update()
+    return () => clearTimeout(timer)
+  }, [])
+
+  const date = new Date(savedAt)
+  const today = new Date(now)
+  const params = { y: date.getFullYear(), m: date.getMonth() + 1, d: date.getDate() }
+  const hours = String(date.getHours()).padStart(2, '0')
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+  const clock = `${hours}:${minutes}`
+  const full = `${t('clock.ymd', params)} ${clock}`
+  let display = clock
+  if (params.y !== today.getFullYear()) display = full
+  else if (date.getMonth() !== today.getMonth() || params.d !== today.getDate()) display = `${t('clock.md', params)} ${clock}`
+  return <time className="dsh-cn-time" dateTime={date.toISOString()} title={full}>{display}</time>
 }
 
 export function useNoteCopy(text: string) {

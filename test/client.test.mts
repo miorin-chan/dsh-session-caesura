@@ -59,6 +59,10 @@ test('registers localized slots, shows the rest while Mod is held and disposes i
         },
       },
       locale: {
+        bind: name => {
+          assert.equal(name, 'chat')
+          return key => key
+        },
         register: (name, labels) => {
           dictionaries.set(name, labels)
           return () => dictionaries.delete(name)
@@ -173,7 +177,7 @@ test('uses ordinary submission only when the composer is empty', () => {
   assert.deepEqual(calls, [['draft', note.text], ['persist'], ['submit']])
 })
 
-test('appends to the saved note with one blank line and refreshes subscribed readers', () => {
+test('appends to a legacy note, records the latest save time and notifies readers', ({ mock }) => {
   const storage = fakeStorage()
   const events = new EventTarget()
   const store = createNoteStore(() => storage, events)
@@ -182,12 +186,15 @@ test('appends to the saved note with one blank line and refreshes subscribed rea
   assert.deepEqual(readNote(store.read('a')), existing)
   let updates = 0
   const unsubscribe = store.subscribe('a', () => { updates++ })
+  let now = 1_795_000_000_000
+  mock.method(Date, 'now', () => now)
   store.append('a', { endSeq: 42, text: '\n\t\n  Next note' })
-  const appended = { endSeq: 42, text: `${note.text}\n\n  Next note` }
+  const appended = { endSeq: 42, text: `${note.text}\n\n  Next note`, savedAt: now }
   assert.deepEqual(readNote(store.read('a')), appended)
+  now += 60_000
   store.append('a', { endSeq: 51, text: 'After another turn' })
   assert.equal(updates, 2)
-  assert.deepEqual(readNote(store.read('a')), { endSeq: 51, text: `${appended.text}\n\nAfter another turn` })
+  assert.deepEqual(readNote(store.read('a')), { endSeq: 51, text: `${appended.text}\n\nAfter another turn`, savedAt: now })
   assert.equal(readNote(store.read('b')), null)
   const event = new Event('storage')
   Object.defineProperty(event, 'key', { value: 'dsh.closing-note.a' })
@@ -200,11 +207,16 @@ test('appends to the saved note with one blank line and refreshes subscribed rea
   for (const invalid of ['{', 'null', '{"endSeq":2,"text":"/command"}', '{"endSeq":-1,"text":"note"}']) {
     assert.equal(readNote(invalid), null)
   }
+  for (const savedAt of [null, '2026-11-23', 1.5, Number.MAX_SAFE_INTEGER]) {
+    assert.deepEqual(readNote(JSON.stringify({ ...note, savedAt })), note)
+  }
 })
 
-test('rewind restores the note without sending and only removes the matching saved version', () => {
+test('rewind restores the note without sending and only removes the matching saved version', ({ mock }) => {
   const storage = fakeStorage()
   const store = createNoteStore(() => storage, new EventTarget())
+  const savedAt = 1_795_000_000_000
+  mock.method(Date, 'now', () => savedAt)
   let current = draft.draft
   const persisted = []
   const actions = {
@@ -213,12 +225,14 @@ test('rewind restores the note without sending and only removes the matching sav
     submit: () => assert.fail('rewind must not send'),
   }
   store.append('a', note)
+  const saved = { ...note, savedAt }
   assert.equal(restoreNote(draft, note, actions), false)
-  assert.deepEqual(readNote(store.read('a')), note)
+  assert.deepEqual(readNote(store.read('a')), saved)
   store.append('a', { ...note, text: 'New note' })
-  store.remove('a', note)
-  const combined = readNote(store.read('a'))
-  assert.deepEqual(combined, { ...note, text: `${note.text}\n\nNew note` })
+  store.remove('a', saved)
+  const combined = { ...saved, text: `${note.text}\n\nNew note` }
+  store.remove('a', { ...combined, savedAt: savedAt - 1 })
+  assert.deepEqual(readNote(store.read('a')), combined)
   assert.equal(restoreNote(empty, combined, actions), true)
   assert.deepEqual(persisted, [combined.text])
   store.remove('a', combined)
