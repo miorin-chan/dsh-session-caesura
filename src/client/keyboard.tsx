@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useLayoutEffect, useRef, useState } from 'react'
 import type { KeyboardEvent, PropsWithChildren } from 'react'
+import { isDarwinDesktop } from '@deepseek-ai/dsh-client-ui-primitives'
 
 interface SaveAction {
   readonly anchor: HTMLElement
@@ -18,8 +19,12 @@ const composerEditor = '[data-composer-input][contenteditable="true"]'
 const highlightedCandidate = '[data-trigger-menu] [role="listbox"][aria-activedescendant]'
 const hiddenRegion = '[hidden], [inert]'
 
-export function primaryModifier(event: Pick<globalThis.KeyboardEvent, 'metaKey' | 'ctrlKey'>): boolean {
-  return /^Mac/i.test(navigator.platform) ? event.metaKey : event.ctrlKey
+export function primaryModifier(event: Pick<globalThis.KeyboardEvent, 'type' | 'key' | 'metaKey' | 'ctrlKey'>): boolean {
+  const desktop = document.documentElement.dataset.platform
+  const mac = desktop === undefined ? /mac|iphone|ipad/iu.test(navigator.platform) : isDarwinDesktop()
+  const key = mac ? 'Meta' : 'Control'
+  // The modifier's own keydown can arrive without its modifier bit set.
+  return (event.type === 'keydown' && event.key === key) || (mac ? event.metaKey : event.ctrlKey)
 }
 
 export function ComposerKeyboardFrame({ children }: PropsWithChildren) {

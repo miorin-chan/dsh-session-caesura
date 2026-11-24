@@ -27,6 +27,7 @@ test('registers localized slots, shows the rest while Mod is held and disposes i
   const mountedStyles = new Set()
   globalThis.document = Object.assign(new EventTarget(), {
     createElement: () => ({ remove() { mountedStyles.delete(this) } }),
+    documentElement: { dataset: {} },
     head: { append: style => mountedStyles.add(style) },
   })
   try {
@@ -53,6 +54,7 @@ test('registers localized slots, shows the rest while Mod is held and disposes i
       useSyncExternalStore: (_subscribe, snapshot) => snapshot(),
     }
     const publishedUi = {
+      isDarwinDesktop: () => document.documentElement.dataset.platform === 'darwin',
       UserMessageBubble: () => null,
       IconCopyOutlineRegular: () => null,
       IconEditOutlineRegular: () => null,
@@ -102,21 +104,29 @@ test('registers localized slots, shows the rest while Mod is held and disposes i
         useInput: select => select({ ...currentDraft, queue: [] }),
       })
     }
-    function key(type, modifier) {
-      const event = Object.assign(new Event(type, { cancelable: true }), { metaKey: false, ctrlKey: false }, modifier)
+    function key(type: 'keydown' | 'keyup', init: KeyboardEventInit = {}) {
+      const event = Object.assign(new Event(type, { cancelable: true }), { key: '', metaKey: false, ctrlKey: false }, init)
       assert.equal(window.dispatchEvent(event), true)
     }
     const originalNavigator = Object.getOwnPropertyDescriptor(globalThis, 'navigator')
     try {
-      for (const [platform, primary, secondary] of [
-        ['MacIntel', 'metaKey', 'ctrlKey'], ['Win32', 'ctrlKey', 'metaKey'],
-      ]) {
+      for (const [platform, desktop, mac] of [
+        ['MacIntel', undefined, true], ['Win32', undefined, false],
+        ['Win32', 'darwin', true], ['MacIntel', 'win32', false],
+      ] as const) {
         Object.defineProperty(globalThis, 'navigator', { configurable: true, value: { platform } })
+        document.documentElement.dataset.platform = desktop
+        const [mod, other] = mac ? ['Meta', 'Control'] : ['Control', 'Meta']
+        const [primary, secondary] = mac ? ['metaKey', 'ctrlKey'] : ['ctrlKey', 'metaKey']
         assert.equal(renderComposer(), null)
-        key('keydown', { [secondary]: true })
+        key('keydown', { key: other, [secondary]: true })
         assert.equal(renderComposer(), null)
-        key('keydown', { [primary]: true })
-        assert.equal(renderComposer().props.children[0].props['data-dsh-session-caesura-save'], '')
+        key('keydown', { key: mod })
+        assert.equal(renderComposer()?.props.children[0].props['data-dsh-session-caesura-save'], '')
+        key('keyup', { key: mod })
+        assert.equal(renderComposer(), null)
+        key('keydown', { key: 'a', [primary]: true })
+        assert.equal(renderComposer()?.props.children[0].props['data-dsh-session-caesura-save'], '')
         for (const ineligible of [empty, { ...draft, draft: '/model' },
           { ...draft, attachmentIds: ['file'] }, { ...draft, occurrences: ['chip'] }]) {
           currentDraft = ineligible
