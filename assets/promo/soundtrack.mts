@@ -10,7 +10,7 @@
 // 柔和的 FM 颤音琴、正弦低音和一套轻电子鼓，拨奏与颤音琴送进附点八分的乒乓回声。
 // 96 BPM 4/4，一小节 2.5 s，F 大调，Fmaj9–Dm9/Bbmaj9–Gm9/C11。时间为成片绝对时间：
 //   0.0–2.5    标志：铺底吸气般升起，颤音琴琶音随落墨上行
-//   2.5–9.1    动机，带点滑稽：踮脚的马林巴配「嘭-嚓」方波低音；发送时滑哨，思考时木鱼，回复时弱音长号垂头
+//   2.5–9.1    动机，轻微诙谐：踮脚的马林巴配柔和的「嘭-嚓」低音；发送时短滑哨，思考时木鱼，回复时远处的弱音长号
 //   9.1–9.9    倒带：刚才奏过的音乐被倒着快放回去，音高随带速升降
 //   10.0–12.5  按住 ⌘：build，十六分拨奏渐强，铺底滤波打开，riser 推向点击
 //   12.5       第一次保存：一切切断，空一拍（caesura），drop 在第二拍随结语落定，进入半速律动
@@ -281,7 +281,7 @@ function tuba(m: number, t0: number, dur: number, vel = 0.7) {
   const f = mtof(m), lp = biquad('lp', 1600, 1.1);
   let p = 0;
   const buf = render(dur + 0.15, (tt, i) => {
-    if (i % 32 === 0) tune(lp, 'lp', 450 + 1300 * Math.exp(-tt / 0.06), 1.1);
+    if (i % 32 === 0) tune(lp, 'lp', 380 + 700 * Math.exp(-tt / 0.05), 0.8);
     const dt = f / SR, q = (p + 0.5) % 1;
     const x = (2 * p - 1 - polyBlep(p, dt)) - (2 * q - 1 - polyBlep(q, dt));
     p += dt;
@@ -289,7 +289,7 @@ function tuba(m: number, t0: number, dur: number, vel = 0.7) {
     const env = Math.min(1, tt / 0.008) * (tt > dur ? Math.exp(-(tt - dur) / 0.03) : Math.exp(-tt / 0.6));
     return run(lp, x * 0.5) * env * vel;
   });
-  place(buf, t0, { gain: 0.13, pan: 0.15, verb: 0.2, keys: true });
+  place(buf, t0, { gain: 0.09, pan: 0.15, verb: 0.2, keys: true });
 }
 
 /** Slide whistle: a breathy sine gliding from `m0` to `m1` with a little wobble. */
@@ -311,12 +311,12 @@ function slideWhistle(t0: number, t1: number, m0: number, m1: number, gain = 0.0
  * The long last note sags in pitch and wobbles, the cartoon sound of a small letdown.
  */
 function sadTrombone(m: number, t0: number, dur: number, { last = false, vel = 0.7 } = {}) {
-  const f = mtof(m), lp = biquad('lp', 600, 3), lp2 = biquad('lp', 2400, 0.6);
+  const f = mtof(m), lp = biquad('lp', 600, 1.4), lp2 = biquad('lp', 2000, 0.6);
   const saws = [-6, 6].map((c) => ({ f: f * 2 ** (c / 1200), p: rand() }));
   const buf = render(dur + 0.2, (tt, i) => {
-    const wah = last ? 0.5 + 0.5 * Math.sin(TAU * 3.2 * tt - Math.PI / 2) : Math.sin(Math.PI * clamp(tt / dur, 0, 1));
-    if (i % 32 === 0) tune(lp, 'lp', 380 + 1100 * wah, 3);
-    const bend = last ? 2 ** ((-70 * clamp((tt - 0.25) / dur, 0, 1)) / 1200) * (1 + 0.012 * Math.sin(TAU * 5.5 * tt) * clamp(tt / 0.3, 0, 1)) : 1;
+    const wah = last ? 0.6 + 0.4 * Math.sin(TAU * 2.4 * tt - Math.PI / 2) : Math.sin(Math.PI * clamp(tt / dur, 0, 1));
+    if (i % 32 === 0) tune(lp, 'lp', 420 + 550 * wah, 1.4);
+    const bend = last ? 2 ** ((-35 * clamp((tt - 0.25) / dur, 0, 1)) / 1200) * (1 + 0.006 * Math.sin(TAU * 5 * tt) * clamp(tt / 0.3, 0, 1)) : 1;
     let x = 0;
     for (const s of saws) {
       const dt = (s.f * bend) / SR;
@@ -327,12 +327,12 @@ function sadTrombone(m: number, t0: number, dur: number, { last = false, vel = 0
     const env = Math.min(1, tt / 0.03) * (tt > dur ? Math.exp(-(tt - dur) / 0.06) : 1);
     return run(lp2, run(lp, x / 2)) * env * vel;
   });
-  place(buf, t0, { gain: 0.16, pan: -0.1, verb: 0.35, keys: true });
+  place(buf, t0, { gain: 0.1, pan: -0.1, verb: 0.4, keys: true });
 }
 
 /** Woodblock tick for the waiting: a resonant noise click over a tiny thump. */
 function woodblock(t0: number, high: boolean, vel = 0.6) {
-  noiseHit(t0, { len: 0.06, decay: 0.012, type: 'bp', f: high ? 1900 : 1350, q: 9, gain: 0.45 * vel, pan: high ? 0.25 : -0.25, verb: 0.2 });
+  noiseHit(t0, { len: 0.06, decay: 0.012, type: 'bp', f: high ? 1900 : 1350, q: 9, gain: 0.3 * vel, pan: high ? 0.25 : -0.25, verb: 0.2 });
 }
 
 /** Low impact for the drops: a long sine boom. */
@@ -464,18 +464,18 @@ const b10 = END_BAR - 1;
 pad(CH.F.pad, C.logo[0] - 0.1, C.logo[3] + 0.3, { attack: 1.0, release: 0.9, open: () => 1300 });
 [65, 69, 72, 76].forEach((m, k) => vibe(m, C.logo[0] + 0.05 + k * 0.22, 0.42 + k * 0.03));
 
-// Motivation, played for a smile: a tiptoeing marimba tune with chromatic neighbours over an oom-pah bass.
+// Motivation, played with a light smile: a tiptoeing marimba tune over a soft oom-pah bass.
 // The send flies off on a slide whistle, a woodblock ticks while the model thinks, and its reply gets a sad
 // trombone. The rewind then runs all of it backwards.
 const tiptoe = (bar: number, notes: [number, number][], vel = 0.55) =>
   notes.forEach(([beat, m]) => mallet(m, T0(bar, beat), vel * (beat % 1 ? 0.8 : 1), { echo: 0.08, pan: 0.15 }));
-tiptoe(1, [[0, 72], [0.5, 71], [1, 72], [1.5, 69], [2, 65], [2.5, 67], [3, 69], [3.5, 72]]);
+tiptoe(1, [[0, 72], [0.5, 69], [1, 72], [1.5, 69], [2, 65], [2.5, 67], [3, 69], [3.5, 72]], 0.45);
 tuba(41, T0(1, 0), D(0.4)); tuba(36, T0(1, 2), D(0.4));
 for (const beat of [1, 3]) [57, 60, 65].forEach((m) => mallet(m, T0(1, beat), 0.32, { echo: 0, pan: -0.2 }));
-tiptoe(2, [[0, 70], [0.5, 69], [1, 70], [1.5, 67], [2, 64]]);
+tiptoe(2, [[0, 70], [0.5, 67], [1, 70], [1.5, 67], [2, 64]], 0.45);
 tuba(36, T0(2, 0), D(0.4)); tuba(43, T0(2, 2), D(0.3));
 [58, 60, 64].forEach((m) => mallet(m, T0(2, 1), 0.32, { echo: 0, pan: -0.2 }));
-slideWhistle(C.sent[0], C.sent[0] + 0.32, 65, 84);
+slideWhistle(C.sent[0], C.sent[0] + 0.28, 69, 77, 0.035);
 for (let t = C.r2Think[0], k = 0; t < C.r2Done - 0.05; t += BEAT / 2, k++) woodblock(t, k % 2 === 0, 0.5);
 const wah = C.r2Reply[0], step = 0.4;
 [[58, 0], [57, 1], [56, 2]].forEach(([m, k]) => sadTrombone(m, wah + k * step, step * 0.8));
