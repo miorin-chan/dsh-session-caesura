@@ -14,6 +14,17 @@ export const styles = `
    src/client/chat/MessageItem.module.css (.userRow) and MessageIconActions.module.css (.timeStart, .action).
    Copyright (c) 2026 DeepSeek, MIT. See docs/dsh-ui-MIT.txt. */
 .dsh-cn-note { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; margin-block: 8px; }
+/* Bubble sizing and appearance follow DSH 0.2.2-rc.5: .userStack in the chat stylesheet above and
+   @deepseek-ai/dsh-client-ui-primitives src/UserMessageBubble.module.css (.bubble). Same MIT notice. */
+.dsh-cn-bubble {
+  box-sizing: border-box;
+  max-width: min(calc(var(--dsh-chat-content-width, 748px) * 0.702), 82%);
+  background: var(--dsw-specific-bubble); border-radius: var(--dsw-radius-xl);
+  padding: 10px 16px; color: var(--dsw-alias-label-primary);
+  font-size: var(--dsh-content-font-size, 14px);
+  line-height: calc(22px + var(--dsh-content-font-delta, 0px));
+  white-space: pre-wrap; overflow-wrap: anywhere;
+}
 .dsh-cn-title {
   display: flex; align-items: center; gap: 4px;
   color: var(--dsw-alias-label-secondary); font-size: var(--dsh-content-font-size-secondary, 13px);

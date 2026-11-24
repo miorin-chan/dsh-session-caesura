@@ -20,7 +20,10 @@ function fakeStorage() {
 
 test('registers localized slots, shows the rest while Mod is held and disposes its resources', async () => {
   let registration
-  globalThis.window = Object.assign(new EventTarget(), { __ModuleLoader__: { load: entry => { registration = entry } } })
+  globalThis.window = Object.assign(new EventTarget(), {
+    __ModuleLoader__: { load: entry => { registration = entry } },
+    localStorage: fakeStorage(),
+  })
   const mountedStyles = new Set()
   globalThis.document = Object.assign(new EventTarget(), {
     createElement: () => ({ remove() { mountedStyles.delete(this) } }),
@@ -47,6 +50,7 @@ test('registers localized slots, shows the rest while Mod is held and disposes i
         state[index] ??= initial
         return [state[index], value => { state[index] = value }]
       },
+      useSyncExternalStore: (_subscribe, snapshot) => snapshot(),
     }
     const plugin = registration.factory(id => id === 'react' ? react : require(id))
     plugin.apply({
@@ -128,6 +132,22 @@ test('registers localized slots, shows the rest while Mod is held and disposes i
       if (originalNavigator) Object.defineProperty(globalThis, 'navigator', originalNavigator)
       else delete globalThis.navigator
     }
+
+    const quoted = { ...note, text: '> A quote from the conversation\n\nMy next note', savedAt: 1_795_000_000_000 }
+    window.localStorage.setItem('dsh.closing-note.session', JSON.stringify(quoted))
+    const renderTail = entries.get('conversation.chat.turnTail').component
+    const sendable = renderTail({
+      turn: { end: { seq: quoted.endSeq } }, sessionId: 'session', t: key => key,
+      useAccess: () => true, useInput: select => select(empty),
+      useSession: select => select({ openState: 'open', pendingSubmissions: [] }),
+    })
+    const card = sendable.type(sendable.props)
+    state.length = 0
+    hookIndex = 0
+    const [, bubble, actions] = card.type(card.props).props.children
+    assert.equal(bubble.props.children, quoted.text)
+    assert.equal(actions.props.children[0].props.savedAt, quoted.savedAt)
+    componentEffects.pop()?.()
 
     effects.reverse().forEach(dispose => dispose())
     assert.equal(entries.size, 0)
