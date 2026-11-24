@@ -52,7 +52,17 @@ test('registers localized slots, shows the rest while Mod is held and disposes i
       },
       useSyncExternalStore: (_subscribe, snapshot) => snapshot(),
     }
-    const plugin = registration.factory(id => id === 'react' ? react : require(id))
+    const publishedUi = {
+      UserMessageBubble: () => null,
+      IconCopyOutlineRegular: () => null,
+      IconEditOutlineRegular: () => null,
+      IconSendOutlineRegular: () => null,
+    }
+    const plugin = registration.factory(id => {
+      if (id === 'react') return react
+      if (id === '@deepseek-ai/dsh-client-ui-primitives') return publishedUi
+      return require(id)
+    })
     plugin.apply({
       effect: install => effects.push(install()),
       slots: {
@@ -106,7 +116,7 @@ test('registers localized slots, shows the rest while Mod is held and disposes i
         key('keydown', { [secondary]: true })
         assert.equal(renderComposer(), null)
         key('keydown', { [primary]: true })
-        assert.equal(renderComposer().props.children[0].props.save, true)
+        assert.equal(renderComposer().props.children[0].props['data-dsh-session-caesura-save'], '')
         for (const ineligible of [empty, { ...draft, draft: '/model' },
           { ...draft, attachmentIds: ['file'] }, { ...draft, occurrences: ['chip'] }]) {
           currentDraft = ineligible
@@ -144,9 +154,15 @@ test('registers localized slots, shows the rest while Mod is held and disposes i
     const card = sendable.type(sendable.props)
     state.length = 0
     hookIndex = 0
-    const [, bubble, actions] = card.type(card.props).props.children
+    const [, stack, actions] = card.type(card.props).props.children
+    const bubble = stack.props.children
+    assert.equal(bubble.type, publishedUi.UserMessageBubble)
     assert.equal(bubble.props.children, quoted.text)
-    assert.equal(actions.props.children[0].props.savedAt, quoted.savedAt)
+    const [time, copy, rewind, send] = actions.props.children
+    assert.equal(time.props.savedAt, quoted.savedAt)
+    assert.deepEqual([copy, rewind, send].map(button => button.props.children.type), [
+      publishedUi.IconCopyOutlineRegular, publishedUi.IconEditOutlineRegular, publishedUi.IconSendOutlineRegular,
+    ])
     componentEffects.pop()?.()
 
     effects.reverse().forEach(dispose => dispose())

@@ -1,7 +1,14 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import type { Translate } from '@deepseek-ai/dsh-client-ui-slots'
+import { Tooltip, writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
+// Built from @deepseek-ai/dsh-client-ui-chat 0.2.2-rc.5, src/client/chat. MIT, docs/dsh-ui-MIT.txt.
+import { formatMessageClock, type ClockTranslate } from '@deepseek-ai/dsh-client-ui-chat/src/client/chat/message-chrome.ts'
+import { useCalendarDay } from '@deepseek-ai/dsh-client-ui-chat/src/client/chat/use-calendar-day.ts'
+import { action, timeStart } from '@deepseek-ai/dsh-client-ui-chat/src/client/chat/MessageIconActions.module.css'
 
-export const styles = `
+// The build embeds the stylesheets from the upstream CSS module imports.
+declare const bundledChatStyles: string
+
+export const styles = bundledChatStyles + `
 /* The turnTail slot's display: contents anchor puts its entries in the footer's flex column.
    Move the note past the action row and use visual order for the footer's focus groups. */
 @supports (reading-flow: flex-visual) {
@@ -10,53 +17,23 @@ export const styles = `
     & > [data-slot="conversation.chat.turnTail"] > .dsh-cn-note { order: 1; }
   }
 }
-/* User row and clock styling follow @deepseek-ai/dsh-client-ui-chat 0.2.2-rc.5,
-   src/client/chat/MessageItem.module.css (.userRow) and MessageIconActions.module.css (.timeStart, .action).
-   Copyright (c) 2026 DeepSeek, MIT. See docs/dsh-ui-MIT.txt. */
-.dsh-cn-note { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; margin-block: 8px; }
-/* Bubble sizing and appearance follow DSH 0.2.2-rc.5: .userStack in the chat stylesheet above and
-   @deepseek-ai/dsh-client-ui-primitives src/UserMessageBubble.module.css (.bubble). Same MIT notice. */
-.dsh-cn-bubble {
-  box-sizing: border-box;
-  max-width: min(calc(var(--dsh-chat-content-width, 748px) * 0.702), 82%);
-  background: var(--dsw-specific-bubble); border-radius: var(--dsw-radius-xl);
-  padding: 10px 16px; color: var(--dsw-alias-label-primary);
-  font-size: var(--dsh-content-font-size, 14px);
-  line-height: calc(22px + var(--dsh-content-font-delta, 0px));
-  white-space: pre-wrap; overflow-wrap: anywhere;
+.dsh-cn-note { margin-block: 8px; }
+.dsh-cn-note .dsh-cn-title {
+  display: flex; align-items: center; gap: 4px; color: var(--dsw-alias-label-secondary);
 }
-.dsh-cn-title {
-  display: flex; align-items: center; gap: 4px;
-  color: var(--dsw-alias-label-secondary); font-size: var(--dsh-content-font-size-secondary, 13px);
-}
-.dsh-cn-actions {
-  display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; max-width: 100%;
-}
-.dsh-cn-time {
-  padding-inline-end: 12px;
-  font-size: var(--dsh-content-font-size-secondary, 13px);
-  line-height: calc(24px + var(--dsh-content-font-delta, 0px));
-  color: var(--dsw-alias-label-tertiary);
-  white-space: nowrap;
-}
-.dsh-cn-actions .dsh-cn-button svg {
-  width: calc(15px + var(--dsh-content-font-delta, 0px));
-  height: calc(15px + var(--dsh-content-font-delta, 0px));
-}
-.dsh-cn-button {
-  box-sizing: border-box; display: inline-grid; place-items: center; flex: none;
-  width: calc(28px + var(--dsh-content-font-delta, 0px)); height: calc(28px + var(--dsh-content-font-delta, 0px));
-  padding: 0; border: 0; border-radius: var(--dsw-radius-sm); background: transparent;
-  color: var(--dsw-alias-label-tertiary, var(--dsw-alias-label-secondary)); cursor: pointer;
+/* Keep note actions visible independently of the enclosing reply and allow wrapping at narrow widths. */
+.dsh-cn-note .dsh-cn-actions {
+  flex-wrap: wrap; justify-content: flex-end; height: auto; max-width: 100%; opacity: 1;
 }
 /* Overlay the primary action from the right slot without adding toolbar width.
    Geometry and card background follow @deepseek-ai/dsh-client-ui-conversation 0.2.2-rc.5,
    src/client/skeleton/InputBar.module.css (.card, .row, .primary, .trailing).
    Copyright (c) 2026 DeepSeek, MIT. See docs/dsh-ui-MIT.txt. */
-.dsh-cn-button.dsh-cn-save {
+.dsh-cn-save {
   position: absolute;
   right: 8px; bottom: 8px; z-index: 1;
-  width: 34px; height: 34px;
+  box-sizing: border-box; display: inline-grid; place-items: center;
+  width: 34px; height: 34px; padding: 0; cursor: pointer;
   border: 1px solid var(--dsw-alias-border-l4);
   border-radius: 50%; corner-shape: round;
   /* Match the card behind the original outline and cover the native arrow. */
@@ -77,26 +54,20 @@ export const styles = `
   line-height: 1.4;
   pointer-events: none;
 }
-.dsh-cn-button[aria-disabled='true'] { opacity: 0.45; cursor: default; }
-.dsh-cn-button:focus-visible {
+.dsh-cn-save:focus-visible {
   outline: var(--dsw-focus-ring-width, 2px) solid var(--dsw-focus-ring-color, var(--dsw-alias-brand-primary));
   outline-offset: -2px;
 }
 @media (hover: hover) {
-  .dsh-cn-button:not([aria-disabled='true']):hover {
-    color: var(--dsw-alias-label-primary);
-  }
-  .dsh-cn-button:not(.dsh-cn-save):not([aria-disabled='true']):hover {
-    background: var(--dsw-alias-interactive-bg-hover);
-  }
+  .dsh-cn-save:hover { color: var(--dsw-alias-label-primary); }
 }
 .dsh-cn-status { color: var(--dsw-alias-state-error-primary); font-size: 12px; }
-.dsh-cn-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 `
 
-const artwork = {
-  // Bravura SMuFL restQuarter (U+E4E5), scaled to the icon viewport. See docs/bravura-OFL.txt.
-  rest: <path fill="currentColor" stroke="none" d="
+// Bravura SMuFL restQuarter (U+E4E5), scaled to the icon viewport. See docs/bravura-OFL.txt.
+export function RestIcon({ size }: { size: number }) {
+  return <svg aria-hidden="true" focusable="false" width={size} height={size} viewBox="0 0 24 24">
+    <path fill="currentColor" d="
     M10.39 13.04 C10.83 13.6 11.23 14.13 11.59 14.72 C11.65 14.84 11.76 15.06 11.76 15.12 C11.76 15.14 11.76
     15.2 11.73 15.23 C11.68 15.34 11.56 15.37 11.42 15.37 C11.31 15.37 11.09 15.31 10.98 15.28 C10.83 15.28
     10.67 15.2 10.53 15.2 C9.32 15.2 8.22 16.41 8.22 17.9 C8.22 19.3 9.43 20.68 11.48 22.25 C11.71 22.42
@@ -109,66 +80,32 @@ const artwork = {
     14.68 7.14 C14.68 7.14 10.53 2.2 10.05 1.72 C9.91 1.58 9.71 1.5 9.54 1.5 C9.26 1.5 8.98 1.7 8.98 2.09
     C8.98 2.23 9.01 2.37 9.09 2.54 C9.21 2.85 10.81 4.28 10.81 6.3 C10.81 7.34 10.39 8.55 9.12 9.87 C8.84
     10.15 8.73 10.46 8.73 10.68 C8.73 11.07 9.01 11.35 9.01 11.35 Z
-  " />,
-  copy: <><rect x="8" y="8" width="12" height="12" rx="2" /><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" /></>,
-  check: <path d="m5 12 4 4L19 6" />,
-  rewind: <><path d="M4 10h11a5 5 0 0 1 0 10h-3" /><path d="m9 5-5 5 5 5" /></>,
-  send: <><path d="m3 10 18-7-7 18-3.4-7.6L3 10Z" /><path d="m10.6 13.4 5-5" /></>,
+    " />
+  </svg>
 }
 
-type Glyph = keyof typeof artwork
-
-export function Icon({ name, size = 17 }: { name: Glyph; size?: number }) {
-  return <svg aria-hidden="true" focusable="false" width={size} height={size} viewBox="0 0 24 24"
-    fill="none" stroke="currentColor" strokeWidth={1.65}
-    strokeLinecap="round" strokeLinejoin="round">{artwork[name]}</svg>
-}
-
-export function IconButton({ label, hint, unavailable = false, save = false, onClick, children }: {
+export function NoteAction({ label, unavailableReason, onClick, children }: {
   label: string
-  hint?: string
-  unavailable?: boolean
-  save?: boolean
+  unavailableReason?: string
   onClick: () => void
   children: ReactNode
 }) {
-  const description = hint ?? label
-  return <button type="button" className={`dsh-cn-button${save ? ' dsh-cn-save' : ''}`}
-    data-dsh-session-caesura-save={save ? '' : undefined} aria-label={label} aria-disabled={unavailable || undefined}
-    aria-description={hint} title={description}
-    onMouseDown={save ? event => event.preventDefault() : undefined}
-    onClick={() => { if (!unavailable) onClick() }}>{children}</button>
+  const unavailable = unavailableReason !== undefined
+  return <Tooltip label={unavailableReason ?? label} side="bottom" openOnClick={unavailable}>
+    <button type="button" className={action} aria-label={label} aria-disabled={unavailable || undefined}
+      aria-description={unavailableReason} data-unavailable={unavailable || undefined}
+      onClick={unavailable ? undefined : onClick}>{children}</button>
+  </Tooltip>
 }
 
-// Local calendar formatting follows formatMessageClock and useCalendarDay from
-// @deepseek-ai/dsh-client-ui-chat 0.2.2-rc.5, src/client/chat/{message-chrome,use-calendar-day}.ts.
-// Copyright (c) 2026 DeepSeek, MIT. See docs/dsh-ui-MIT.txt.
-export function NoteTime({ savedAt, t }: { savedAt: number; t: Translate<'clock.md' | 'clock.ymd'> }) {
-  const [now, setNow] = useState(Date.now)
-  useEffect(() => {
-    let timer: ReturnType<typeof setTimeout>
-    const update = () => {
-      const current = Date.now()
-      const midnight = new Date(current)
-      midnight.setHours(24, 0, 0, 0)
-      setNow(current)
-      timer = setTimeout(update, Math.max(1, midnight.getTime() - current))
-    }
-    update()
-    return () => clearTimeout(timer)
-  }, [])
-
+export function NoteTime({ savedAt, t }: { savedAt: number; t: ClockTranslate }) {
+  const day = useCalendarDay()
   const date = new Date(savedAt)
-  const today = new Date(now)
   const params = { y: date.getFullYear(), m: date.getMonth() + 1, d: date.getDate() }
-  const hours = String(date.getHours()).padStart(2, '0')
-  const minutes = String(date.getMinutes()).padStart(2, '0')
-  const clock = `${hours}:${minutes}`
-  const full = `${t('clock.ymd', params)} ${clock}`
-  let display = clock
-  if (params.y !== today.getFullYear()) display = full
-  else if (date.getMonth() !== today.getMonth() || params.d !== today.getDate()) display = `${t('clock.md', params)} ${clock}`
-  return <time className="dsh-cn-time" dateTime={date.toISOString()} title={full}>{display}</time>
+  const full = `${t('clock.ymd', params)} ${formatMessageClock(savedAt, t, savedAt)}`
+  return <time className={timeStart} dateTime={date.toISOString()} title={full}>
+    {formatMessageClock(savedAt, t, day)}
+  </time>
 }
 
 export function useNoteCopy(text: string) {
@@ -185,14 +122,9 @@ export function useNoteCopy(text: string) {
     if (pending.current) return
     pending.current = true
     clearTimeout(timer.current)
-    let result: 'copied' | 'copyFailed' = 'copied'
-    try {
-      await navigator.clipboard.writeText(text)
-    } catch {
-      result = 'copyFailed'
-    } finally {
-      pending.current = false
-    }
+    const copied = await writeClipboard(text).catch(() => false)
+    pending.current = false
+    const result = copied ? 'copied' : 'copyFailed'
     if (!active.current) return
     setStatus(result)
     timer.current = setTimeout(() => setStatus('ready'), result === 'copied' ? 1200 : 3000)

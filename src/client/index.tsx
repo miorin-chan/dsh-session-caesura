@@ -1,4 +1,11 @@
 import { useCallback, useEffect, useState, useSyncExternalStore, type ReactNode } from 'react'
+// DSH 0.2.2-rc.5 shares these exports from @deepseek-ai/dsh-client-ui-primitives src/index.ts.
+import {
+  IconCheckOutlineRegular, IconCopyOutlineRegular, IconEditOutlineRegular, IconSendOutlineRegular, UserMessageBubble,
+} from '@deepseek-ai/dsh-client-ui-primitives'
+// @deepseek-ai/dsh-client-ui-chat 0.2.2-rc.5, src/client/chat. MIT, docs/dsh-ui-MIT.txt.
+import { referenceSummary, userRow, userStack } from '@deepseek-ai/dsh-client-ui-chat/src/client/chat/MessageItem.module.css'
+import { actions, visuallyHidden } from '@deepseek-ai/dsh-client-ui-chat/src/client/chat/MessageIconActions.module.css'
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type { SessionSnapshot } from '@deepseek-ai/dsh-api-session-controller/client'
@@ -9,7 +16,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { canSaveDraft, canSendNote, createNoteStore, readNote, restoreNote, saveDraftAsNote, submitNote } from '../lib/notes.js'
 import type { ClosingNote } from '../lib/notes.js'
-import { Icon, IconButton, NoteTime, styles, useNoteCopy } from './appearance.js'
+import { NoteAction, NoteTime, RestIcon, styles, useNoteCopy } from './appearance.js'
 import { ComposerKeyboardFrame, primaryModifier, useComposerSaveAnchor } from './keyboard.js'
 import { labels } from './labels.js'
 
@@ -78,7 +85,10 @@ export function apply(ctx: Context): void {
       if (!showRest && !saveFailed && anchor === null) return null
       return (
         <>
-          {showRest && <IconButton label={t('save')} save onClick={save}><Icon name="rest" size={24} /></IconButton>}
+          {showRest && <button type="button" className="dsh-cn-save" data-dsh-session-caesura-save=""
+            aria-label={t('save')} title={t('save')} onMouseDown={event => event.preventDefault()} onClick={save}>
+            <RestIcon size={24} />
+          </button>}
           {saveFailed && <span role="alert" className="dsh-cn-save-error">{t('saveFailed')}</span>}
           {anchor !== null && <span ref={anchor} hidden />}
         </>
@@ -139,23 +149,23 @@ function NoteCard({ text, t, canSend, time, onRewind, onSend }: {
   const [rewindFailed, setRewindFailed] = useState(false)
   const hint = canSend ? undefined : t('emptyDraft')
   return (
-    <section className="dsh-cn-note" data-dsh-session-caesura aria-label={t('title')}>
-      <div className="dsh-cn-title"><Icon name="rest" size={15} />{t('title')}</div>
-      {/* Keep the saved paragraph breaks, including those adjacent to a Markdown blockquote. */}
-      <div className="dsh-cn-bubble">{text}</div>
-      <div className="dsh-cn-actions">
+    <section className={`${userRow} dsh-cn-note`} data-dsh-session-caesura aria-label={t('title')}>
+      <div className={`${referenceSummary} dsh-cn-title`}><RestIcon size={15} />{t('title')}</div>
+      {/* Pass the literal draft so quote rendering cannot collapse saved paragraph breaks. */}
+      <div className={userStack}><UserMessageBubble>{text}</UserMessageBubble></div>
+      <div className={`${actions} dsh-cn-actions`} data-clock="start">
         {time}
-        <IconButton label={t(status === 'copied' ? 'copied' : 'copy')} onClick={() => { void copy() }}>
-          <Icon name={status === 'copied' ? 'check' : 'copy'} />
-        </IconButton>
-        <IconButton label={t('rewind')} hint={hint} unavailable={!canSend} onClick={() => {
+        <NoteAction label={t(status === 'copied' ? 'copied' : 'copy')} onClick={() => { void copy() }}>
+          {status === 'copied' ? <IconCheckOutlineRegular /> : <IconCopyOutlineRegular />}
+        </NoteAction>
+        <NoteAction label={t('rewind')} unavailableReason={hint} onClick={() => {
           try { onRewind() } catch { setRewindFailed(true) }
-        }}><Icon name="rewind" /></IconButton>
-        <IconButton label={t('send')} hint={hint} unavailable={!canSend} onClick={onSend}>
-          <Icon name="send" />
-        </IconButton>
+        }}><IconEditOutlineRegular /></NoteAction>
+        <NoteAction label={t('send')} unavailableReason={hint} onClick={onSend}>
+          <IconSendOutlineRegular />
+        </NoteAction>
       </div>
-      <span className={status === 'copyFailed' || rewindFailed ? 'dsh-cn-status' : 'dsh-cn-sr'} role="status">
+      <span className={status === 'copyFailed' || rewindFailed ? 'dsh-cn-status' : visuallyHidden} role="status">
         {rewindFailed ? t('rewindFailed') : status === 'ready' ? '' : t(status)}
       </span>
     </section>
