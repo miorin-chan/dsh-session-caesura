@@ -1,6 +1,6 @@
 {
   "name": "@miorin/dsh-session-caesura",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "license": "MIT",
   "description": "Save a private closing note at the end of a conversation to record your progress or what you learned without continuing the conversation.",
   "type": "module",
@@ -78,5 +78,13 @@
   },
   "publishConfig": {
     "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/miorin-chan/dsh-session-caesura.git"
+  },
+  "homepage": "https://github.com/miorin-chan/dsh-session-caesura#readme",
+  "bugs": {
+    "url": "https://github.com/miorin-chan/dsh-session-caesura/issues"
   }
 }
