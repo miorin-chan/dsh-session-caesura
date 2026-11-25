@@ -136,12 +136,13 @@ export function createNoteStore(getStorage: () => Storage, events: Window) {
       storage.setItem(key, JSON.stringify({ ...draft, endSeq: note.endSeq, attachments, savedAt: Date.now() }))
       publish(key)
     },
-    remove(sessionId: string, raw: string): void {
+    remove(sessionId: string, raw: string): boolean {
       const storage = getStorage()
       const key = prefix + sessionId
-      if (storage.getItem(key) !== raw) return
+      if (storage.getItem(key) !== raw) return false
       storage.removeItem(key)
       publish(key)
+      return true
     },
     subscribe(sessionId: string, listener: () => void): () => void {
       const key = prefix + sessionId

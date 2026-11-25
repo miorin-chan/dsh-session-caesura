@@ -22,7 +22,8 @@ The note and its attachments are stored in this browser.
 The note shows the last save time in your local time zone beside **Copy**, **Rewind**, and **Send**.
 Copy takes the text and briefly shows a check mark.
 When the composer is available and empty, Rewind moves the full note back for editing.
-Send submits a copy as a message, including any leading slash text.
+Send dismisses the note and submits it as a message, including any leading slash text.
+If submission fails, the note returns with an error.
 During generation it queues the message. Shift+Enter inserts a line break.
 A highlighted completion and active input-method composition take keyboard priority.
 The primary Stop and Continue actions are available when the turn needs them.

@@ -70,9 +70,23 @@ test('registers localized slots and keeps the rest active for the current saved 
       if (id === '@deepseek-ai/dsh-client-ui-primitives') return publishedUi
       return require(id)
     })
+    const openSession = { openState: 'open', pendingSubmissions: [], subagent: null }
+    const binding = { sessionId: 'session', ctx: {}, session: { getSnapshot: () => openSession } }
+    const submissions = []
+    let submission: Promise<{ kind: string }>
     plugin.apply({
       effect: install => effects.push(install()),
-      conversation: { blocks: { storeFor: () => ({ subscribe: () => {}, getSnapshot: () => undefined }) } },
+      get: () => undefined,
+      sessions: { binding: () => binding },
+      conversation: {
+        blocks: { storeFor: () => ({ subscribe: () => {}, getSnapshot: () => undefined }) },
+        input: { for: () => ({ draftSnapshot: empty, state: { getSnapshot: () => empty } }) },
+        sendSession: (_session, text, attachments, mode) => {
+          submissions.push({ text, attachments, mode })
+          return submission
+        },
+        releaseDraftAttachments: () => {},
+      },
       slots: {
         inject: (_name, install) => install(),
         register: (options, component) => {
@@ -178,15 +192,20 @@ test('registers localized slots and keeps the rest active for the current saved 
     const quoted = { ...note, text: '> A quote from the conversation\n\nMy next note', savedAt: 1_795_000_000_000 }
     window.localStorage.setItem('dsh.closing-note.session', JSON.stringify(quoted))
     const renderTail = entries.get('conversation.chat.turnTail').component
-    const sendable = renderTail({
+    const tailProps = {
       turn: { end: { seq: quoted.endSeq } }, sessionId: 'session', t: key => key,
       useAccess: () => true, useInput: select => select(empty),
-      useSession: select => select({ openState: 'open', pendingSubmissions: [] }),
-    })
-    const card = sendable.type(sendable.props)
+      useSession: select => select(openSession),
+    }
+    function renderCard() {
+      const sendable = renderTail(tailProps)
+      hookIndex = 0
+      const card = sendable.type(sendable.props)
+      return card.type(card.props)
+    }
     state.length = 0
-    hookIndex = 0
-    const [, stack, actions] = card.type(card.props).props.children
+    const section = renderCard()
+    const [, stack, actions] = section.props.children
     const bubble = stack.props.children[1]
     assert.equal(bubble.type, publishedUi.UserMessageBubble)
     assert.equal(bubble.props.children, quoted.text)
@@ -197,6 +216,51 @@ test('registers localized slots and keeps the rest active for the current saved 
     const undo = rewind.props.children.type()
     assert.equal(undo.type, 'svg')
     assert.deepEqual(undo.props.children.map(path => path.props.d), ['M4 10h11a5 5 0 0 1 0 10h-3', 'm9 5-5 5 5 5'])
+
+    let reducedMotion = false
+    window.matchMedia = () => ({ matches: reducedMotion })
+    const motion = Promise.withResolvers<void>()
+    let animations = 0
+    const element = {
+      inert: false, dataset: {}, ownerDocument: { activeElement: null }, querySelectorAll: () => [],
+      animate() { animations++; return { finished: motion.promise } },
+    }
+    const tick = () => new Promise(resolve => setImmediate(resolve))
+    const result = Promise.withResolvers<{ kind: string }>()
+    submission = result.promise
+    section.ref.current = element
+    send.props.onClick({ detail: 1 })
+    send.props.onClick({ detail: 1 })
+    assert.equal(element.inert, true)
+    assert.equal(animations, 1)
+    await tick()
+    assert.deepEqual(submissions, [{ text: quoted.text, attachments: [], mode: 'queue' }])
+    result.resolve({ kind: 'success' })
+    await tick()
+    assert.ok(window.localStorage.getItem(keyOf('session')), 'fast acceptance does not cut off the exit')
+    motion.resolve()
+    await tick()
+    assert.equal(element.dataset.sendHidden, '')
+    assert.equal(window.localStorage.getItem(keyOf('session')), null)
+    assert.equal(renderTail(tailProps), null)
+
+    const raw = JSON.stringify(quoted)
+    window.localStorage.setItem(keyOf('session'), raw)
+    reducedMotion = true
+    const rejected = Promise.withResolvers<{ kind: string }>()
+    submission = rejected.promise
+    const retry = renderCard()
+    retry.ref.current = element
+    delete element.dataset.sendHidden
+    retry.props.children[2].props.children[3].props.onClick({ detail: 1 })
+    assert.equal(element.dataset.sendHidden, '')
+    assert.equal(animations, 1, 'reduced motion skips animation')
+    rejected.resolve({ kind: 'rejected' })
+    await tick()
+    assert.equal(element.inert, false)
+    assert.equal(element.dataset.sendHidden, undefined)
+    assert.equal(window.localStorage.getItem(keyOf('session')), raw)
+    assert.equal(renderCard().props.children[3].props.children, 'sendFailed')
     componentEffects.pop()?.()
 
     effects.reverse().forEach(dispose => dispose())

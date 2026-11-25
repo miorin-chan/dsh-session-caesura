@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type MouseEventHandler, type ReactNode } from 'react'
 import { Tooltip, writeClipboard, type TooltipSide } from '@deepseek-ai/dsh-client-ui-primitives'
 // Built from @deepseek-ai/dsh-client-ui-chat 0.2.2-rc.5, src/client/chat. MIT, docs/dsh-ui-MIT.txt.
 import { formatMessageClock, type ClockTranslate } from '@deepseek-ai/dsh-client-ui-chat/src/client/chat/message-chrome.ts'
@@ -18,6 +18,7 @@ export const styles = bundledChatStyles + `
   }
 }
 .dsh-cn-note { margin-block: 8px; }
+.dsh-cn-note[data-send-hidden] { display: none; }
 .dsh-cn-note .dsh-cn-title {
   display: flex; align-items: center; gap: 4px; color: var(--dsw-alias-label-secondary);
 }
@@ -79,6 +80,34 @@ export const styles = bundledChatStyles + `
 .dsh-cn-status { color: var(--dsw-alias-state-error-primary); font-size: 12px; }
 `
 
+export function beginNoteExit(card: HTMLElement) {
+  const focused = card.ownerDocument.activeElement
+  card.inert = true
+  for (const media of card.querySelectorAll<HTMLMediaElement>('audio, video')) {
+    if (!media.paused) media.pause()
+  }
+  const animation = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? undefined : card.animate([
+    { opacity: 1, transform: 'translateY(0)' },
+    { opacity: 0, transform: 'translateY(-4px)' },
+  ], { duration: 140, easing: 'ease-out', fill: 'forwards' })
+  const hide = () => { card.dataset.sendHidden = '' }
+  if (animation === undefined) hide()
+  const displacedFocus = () => {
+    const active = card.ownerDocument.activeElement
+    return focused !== null && card.contains(focused) && (active === card.ownerDocument.body || active === null)
+  }
+  return {
+    finished: animation?.finished.then(hide, () => {}),
+    displacedFocus,
+    restore() {
+      animation?.cancel()
+      delete card.dataset.sendHidden
+      card.inert = false
+      if (displacedFocus() && focused instanceof HTMLElement) focused.focus({ preventScroll: true })
+    },
+  }
+}
+
 // Bravura SMuFL restQuarter (U+E4E5), scaled to the icon viewport. See docs/bravura-OFL.txt.
 export function RestIcon({ size }: { size: number }) {
   return <svg aria-hidden="true" focusable="false" width={size} height={size} viewBox="0 0 24 24">
@@ -111,7 +140,7 @@ export function NoteAction({ label, unavailableReason, tooltipSide, onClick, chi
   label: string
   unavailableReason?: string
   tooltipSide: TooltipSide
-  onClick: () => void
+  onClick: MouseEventHandler<HTMLButtonElement>
   children: ReactNode
 }) {
   const unavailable = unavailableReason !== undefined

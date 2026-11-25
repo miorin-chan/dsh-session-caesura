@@ -16,7 +16,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 import type { PropsLocale, PropsRenderFactories, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { canSaveDraft, createNoteStore, emptyComposer, hasDraft, sameDraft, type ClosingNote } from '../lib/notes.js'
-import { NoteAction, NoteTime, RestIcon, UndoIcon, styles, useNoteCopy } from './appearance.js'
+import { beginNoteExit, NoteAction, NoteTime, RestIcon, UndoIcon, styles, useNoteCopy } from './appearance.js'
 import { composerOpen, resolveComposer, restoreDraft, sendNote, withNoteLock } from './composer.js'
 import { ComposerKeyboardFrame, primaryModifier, useComposerSaveAnchor } from './keyboard.js'
 import { removeMedia, requireMedia, storeMedia } from './media.js'
@@ -177,34 +177,48 @@ export function apply(ctx: Context): void {
       const [busy, setBusy] = useState(false)
       const [error, setError] = useState<'rewindFailed' | 'sendFailed' | null>(null)
       const active = useRef(false)
-      async function act(action: 'rewind' | 'send'): Promise<void> {
+      async function act(request: { action: 'rewind' } | { action: 'send'; card: HTMLElement; keyboard: boolean }): Promise<void> {
+        const { action } = request
         if (!available || active.current) return
         const composer = resolveComposer(ctx, sessionId)
         if (composer === undefined || !composerOpen(ctx, composer)) return
         active.current = true
         setBusy(true)
         setError(null)
+        let exit: ReturnType<typeof beginNoteExit> | undefined
+        let submitted = false
         try {
-          const files = await requireMedia(note.attachments)
-          if (lifetime.signal.aborted || !composerOpen(ctx, composer) || notes.read(sessionId) !== raw
-            || !emptyComposer(composer.input.state.getSnapshot())) return
-          if (action === 'send') {
-            await sendNote(ctx, composer, note, files, lifetime.signal)
-          } else {
-            const restored = await withNoteLock(sessionId, () => {
-              if (lifetime.signal.aborted || notes.read(sessionId) !== raw || !composerOpen(ctx, composer)
-                || !restoreDraft(composer, note, files)) return false
-              inputActions.persistDraft()
-              notes.remove(sessionId, raw)
-              return true
-            })
-            if (restored) {
-              composer.input.focus()
-              await removeMedia(note.attachments)
+          if (request.action === 'send') exit = beginNoteExit(request.card)
+          const consumed = await withNoteLock(sessionId, async () => {
+            if (lifetime.signal.aborted || notes.read(sessionId) !== raw) return false
+            const files = await requireMedia(note.attachments)
+            if (!composerOpen(ctx, composer) || !emptyComposer(composer.input.state.getSnapshot())) {
+              throw new Error('Closing note composer is unavailable')
             }
+            if (action === 'send') {
+              await sendNote(ctx, composer, note, files, lifetime.signal)
+              submitted = true
+              await exit?.finished
+            } else {
+              if (lifetime.signal.aborted || !restoreDraft(composer, note, files)) return false
+              inputActions.persistDraft()
+            }
+            return notes.remove(sessionId, raw)
+          })
+          if (!consumed) {
+            if (!submitted) exit?.restore()
+            return
           }
+          if (request.action === 'rewind' || (request.keyboard && exit?.displacedFocus() && composerOpen(ctx, composer))) {
+            composer.input.focus()
+          }
+          // The action already succeeded. Cleanup failure must not offer to send again.
+          await removeMedia(note.attachments).catch(() => {})
         } catch {
-          if (!lifetime.signal.aborted) setError(action === 'send' ? 'sendFailed' : 'rewindFailed')
+          if (!submitted) {
+            exit?.restore()
+            if (!lifetime.signal.aborted) setError(action === 'send' ? 'sendFailed' : 'rewindFailed')
+          }
         } finally {
           active.current = false
           setBusy(false)
@@ -213,7 +227,8 @@ export function apply(ctx: Context): void {
       return <NoteCard text={note.text} t={t} canSend={available && !busy} error={error}
         time={note.savedAt !== undefined && <NoteTime savedAt={note.savedAt} t={chatText} />}
         media={note.attachments.length > 0 && <NoteMedia attachments={note.attachments} t={t} renderFactorySlot={renderFactorySlot} />}
-        onRewind={() => { void act('rewind') }} onSend={() => { void act('send') }} />
+        onRewind={() => { void act({ action: 'rewind' }) }}
+        onSend={(card, keyboard) => { void act({ action: 'send', card, keyboard }) }} />
     }
   }, `${namespace}: composer and turn tail`)
 }
@@ -242,15 +257,16 @@ function NoteCard({ text, t, canSend, error, time, media, onRewind, onSend }: {
   time: ReactNode
   media: ReactNode
   onRewind: () => void
-  onSend: () => void
+  onSend: (card: HTMLElement, keyboard: boolean) => void
 }) {
+  const card = useRef<HTMLElement>(null)
   const { status, copy } = useNoteCopy(text)
   const hint = canSend ? undefined : t('emptyDraft')
   const hasError = status === 'copyFailed' || error !== null
   // Keep tooltips clear of visible error feedback below the toolbar.
   const tooltipSide = hasError ? 'top' : 'bottom'
   return (
-    <section className={`${userRow} dsh-cn-note`} data-dsh-session-caesura aria-label={t('title')}>
+    <section ref={card} className={`${userRow} dsh-cn-note`} data-dsh-session-caesura aria-label={t('title')}>
       <div className={`${referenceSummary} dsh-cn-title`}><RestIcon size={15} />{t('title')}</div>
       {/* Pass the literal draft so quote rendering cannot collapse saved paragraph breaks. */}
       <div className={userStack}>
@@ -263,7 +279,9 @@ function NoteCard({ text, t, canSend, error, time, media, onRewind, onSend }: {
           {status === 'copied' ? <IconCheckOutlineRegular /> : <IconCopyOutlineRegular />}
         </NoteAction>}
         <NoteAction label={t('rewind')} unavailableReason={hint} tooltipSide={tooltipSide} onClick={onRewind}><UndoIcon /></NoteAction>
-        <NoteAction label={t('send')} unavailableReason={hint} tooltipSide={tooltipSide} onClick={onSend}>
+        <NoteAction label={t('send')} unavailableReason={hint} tooltipSide={tooltipSide} onClick={event => {
+          if (card.current !== null) onSend(card.current, event.detail === 0)
+        }}>
           <IconSendOutlineRegular />
         </NoteAction>
       </div>
