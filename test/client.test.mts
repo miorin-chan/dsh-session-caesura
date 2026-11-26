@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict'
+import { readFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { test } from 'node:test'
+import { formatMessageClock } from '../lib/clock.js'
 import { canSaveDraft, createNoteStore, emptyComposer, sameDraft } from '../lib/notes.js'
 
 const require = createRequire(import.meta.url)
@@ -347,4 +349,137 @@ test('preserves attachment order, quote and reference offsets, and the leading c
   store.remove('a', store.read('a'))
   assert.equal(store.read('a'), null)
   store.dispose()
+})
+
+test('formats closing-note clocks locally and serializes quotes and references without private imports', async () => {
+  const sameDay = new Date(2026, 4, 15, 9, 5).getTime()
+  const sameYear = new Date(2026, 3, 2, 18, 40).getTime()
+  const priorYear = new Date(2025, 11, 31, 23, 59).getTime()
+  const clockT = (key: 'clock.md' | 'clock.ymd', params?: Record<string, unknown>) =>
+    key === 'clock.md' ? `${params?.m}/${params?.d}` : `${params?.y}-${params?.m}-${params?.d}`
+  assert.equal(formatMessageClock(sameDay, clockT, new Date(2026, 4, 15, 22, 0).getTime()), '09:05')
+  assert.equal(formatMessageClock(sameYear, clockT, sameDay), '4/2 18:40')
+  assert.equal(formatMessageClock(priorYear, clockT, sameDay), '2025-12-31 23:59')
+
+  const bundleText = await readFile(new URL('../client.js', import.meta.url), 'utf8')
+  assert.equal(bundleText.includes('@deepseek-ai/dsh-client-ui-chat/src'), false)
+  assert.equal(bundleText.includes('@deepseek-ai/dsh-client-ui-conversation/src'), false)
+
+  let registration: { id: string; factory: (require: (id: string) => unknown) => { apply: (ctx: unknown) => void } } | undefined
+  globalThis.window = Object.assign(new EventTarget(), {
+    __ModuleLoader__: { load: (entry: typeof registration) => { registration = entry } },
+    localStorage: fakeStorage(),
+    matchMedia: () => ({ matches: true }),
+  }) as unknown as Window & typeof globalThis
+  const mountedStyles: { textContent?: string; remove: () => void }[] = []
+  globalThis.document = Object.assign(new EventTarget(), {
+    createElement: () => {
+      const el = { textContent: '', remove() {} }
+      mountedStyles.push(el)
+      return el
+    },
+    documentElement: { dataset: {} },
+    head: { append: () => {} },
+  }) as unknown as Document
+  try {
+    await import(new URL('../client.js?serialize-check', import.meta.url).href)
+    assert.ok(registration)
+    const effects: Array<() => void> = []
+    const entries = new Map<string, { component: (props: unknown) => unknown }>()
+    const state: unknown[] = []
+    let hookIndex = 0
+    const react = {
+      ...require('react'),
+      useCallback: <T,>(callback: T) => callback,
+      useContext: () => null,
+      useMemo: (create: () => unknown) => create(),
+      useEffect: () => {},
+      useLayoutEffect: () => {},
+      useRef: <T,>(current: T) => ({ current }),
+      useState(initial: unknown) {
+        const index = hookIndex++
+        if (!(index in state)) state[index] = typeof initial === 'function' ? (initial as () => unknown)() : initial
+        return [state[index], (value: unknown) => { state[index] = value }]
+      },
+      useSyncExternalStore: (_subscribe: unknown, snapshot: () => unknown) => snapshot(),
+    }
+    const plugin = registration.factory(id => {
+      if (id === 'react') return react
+      if (id === 'react-dom') return { createPortal: (child: unknown) => child }
+      if (id === '@deepseek-ai/dsh-client-ui-primitives') {
+        return {
+          isDarwinDesktop: () => false,
+          UserMessageBubble: () => null,
+          IconCheckOutlineRegular: () => null,
+          IconCopyOutlineRegular: () => null,
+          IconSendOutlineRegular: () => null,
+          Tooltip: ({ children }: { children: unknown }) => children,
+          writeClipboard: async () => true,
+          formatQuoteText: (text: string) => text.split('\n').map(line => `> ${line}`).join('\n'),
+        }
+      }
+      return require(id)
+    })
+    const openSession = { openState: 'open', pendingSubmissions: [], subagent: null }
+    const binding = { sessionId: 's1', ctx: {}, session: { getSnapshot: () => openSession } }
+    const submissions: Array<{ text: string; attachments: unknown[]; mode: string }> = []
+    plugin.apply({
+      effect: (install: () => () => void) => effects.push(install()),
+      get: (name: string) => (name === 'inputTriggers' ? {
+        sessionOf: () => ({ serializeReference: async (source: string, ref: string) => `[${source}:${ref}]` }),
+      } : undefined),
+      sessions: { binding: () => binding },
+      conversation: {
+        blocks: { storeFor: () => ({ subscribe: () => {}, getSnapshot: () => undefined }) },
+        input: { for: () => ({ draftSnapshot: empty, state: { getSnapshot: () => empty } }) },
+        sendSession: async (_session: unknown, text: string, attachments: unknown[], mode: string) => {
+          submissions.push({ text, attachments, mode })
+          return { kind: 'success' }
+        },
+        releaseDraftAttachments: () => {},
+      },
+      slots: {
+        inject: (_name: string, install: () => () => void) => install(),
+        register: (options: { name: string }, component: (props: unknown) => unknown) => {
+          entries.set(options.name, { component })
+          return () => entries.delete(options.name)
+        },
+      },
+      locale: {
+        bind: () => (key: string) => key,
+        register: () => () => {},
+      },
+    })
+    assert.ok(mountedStyles[0]?.textContent?.includes('\n.dsh-cn-sr {') || mountedStyles[0]?.textContent?.startsWith('.dsh-cn-sr {'))
+    const raw = 'Intro   @a.md!   > first\n> second   '
+    const quoteRaw = '> first\n> second'
+    window.localStorage.setItem(keyOf('s1'), JSON.stringify({
+      endSeq: 42,
+      text: raw,
+      references: [{ offset: 8, length: 6, source: 'file', ref: 'a.md', label: 'a.md', appearance: 'file', clipboardText: '@a.md!' }],
+      quotes: [{ offset: 17, length: quoteRaw.length, text: 'first\nsecond' }],
+      attachments: [],
+    }))
+    const renderTail = entries.get('conversation.chat.turnTail')!.component
+    const sendable = renderTail({
+      turn: { end: { seq: 42 } }, sessionId: 's1', t: (k: string) => k,
+      useAccess: () => true, useInput: (select: (v: unknown) => unknown) => select(empty),
+      useSession: (select: (v: unknown) => unknown) => select(openSession),
+    }) as { type: (p: unknown) => { type: (p: unknown) => { ref: { current: unknown }; props: { children: Array<{ props: { children: Array<{ props: { onClick: (ev: { detail: number }) => void } }> } }> } } }; props: unknown }
+    hookIndex = 0
+    const card = sendable.type(sendable.props)
+    const section = card.type(card.props)
+    section.ref.current = {
+      inert: false, dataset: {}, ownerDocument: { activeElement: null }, querySelectorAll: () => [],
+    }
+    const actionsRow = section.props.children[2]
+    const sendButton = actionsRow.props.children[3]
+    sendButton.props.onClick({ detail: 1 })
+    await new Promise(resolve => setImmediate(resolve))
+    assert.deepEqual(submissions, [{ text: 'Intro   [file:a.md]\n\n> first\n> second', attachments: [], mode: 'queue' }])
+    effects.reverse().forEach(dispose => dispose())
+  } finally {
+    delete (globalThis as { window?: unknown }).window
+    delete (globalThis as { document?: unknown }).document
+  }
 })

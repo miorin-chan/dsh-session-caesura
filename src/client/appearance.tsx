@@ -1,14 +1,54 @@
 import { useEffect, useRef, useState, type MouseEventHandler, type ReactNode } from 'react'
 import { Tooltip, writeClipboard, type TooltipSide } from '@deepseek-ai/dsh-client-ui-primitives'
-// Built from @deepseek-ai/dsh-client-ui-chat 0.2.2-rc.5, src/client/chat. MIT, docs/dsh-ui-MIT.txt.
-import { formatMessageClock, type ClockTranslate } from '@deepseek-ai/dsh-client-ui-chat/src/client/chat/message-chrome.ts'
-import { useCalendarDay } from '@deepseek-ai/dsh-client-ui-chat/src/client/chat/use-calendar-day.ts'
-import { action, timeStart } from '@deepseek-ai/dsh-client-ui-chat/src/client/chat/MessageIconActions.module.css'
+import {
+  formatMessageClock, msUntilNextLocalMidnight, startOfLocalDay, type ClockTranslate,
+} from '../lib/clock.js'
 
-// The build embeds the stylesheets from the upstream CSS module imports.
-declare const bundledChatStyles: string
+function useCalendarDay(): number {
+  const [day, setDay] = useState(() => startOfLocalDay(Date.now()))
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>
+    const arm = (): void => {
+      const now = Date.now()
+      setDay(startOfLocalDay(now))
+      timer = setTimeout(arm, msUntilNextLocalMidnight(now))
+    }
+    timer = setTimeout(arm, msUntilNextLocalMidnight(Date.now()))
+    return () => { clearTimeout(timer) }
+  }, [])
+  return day
+}
 
-export const styles = bundledChatStyles + `
+// Message layout, icon-action sizing, and screen-reader utilities match @deepseek-ai/dsh-client-ui-chat 0.2.2-rc.5 (MIT, docs/dsh-ui-MIT.txt).
+export const styles = `
+.dsh-cn-sr {
+  position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
+}
+.dsh-cn-stack {
+  display: flex; flex-direction: column; align-items: flex-end; gap: 8px;
+  min-width: 0; max-width: min(calc(var(--dsh-chat-content-width, 748px) * 0.702), 82%);
+}
+.dsh-cn-time {
+  padding-right: 12px; font-size: var(--dsh-content-font-size-secondary, 13px);
+  line-height: calc(24px + var(--dsh-content-font-delta, 0px)); color: var(--dsw-alias-label-tertiary);
+  white-space: nowrap;
+}
+.dsh-cn-action {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: calc(28px + var(--dsh-content-font-delta, 0px));
+  height: calc(28px + var(--dsh-content-font-delta, 0px));
+  padding: 6px; border: none; border-radius: var(--dsw-radius-sm);
+  background: transparent; color: var(--dsw-alias-label-tertiary); cursor: pointer;
+}
+.dsh-cn-action svg {
+  width: calc(15px + var(--dsh-content-font-delta, 0px));
+  height: calc(15px + var(--dsh-content-font-delta, 0px));
+}
+.dsh-cn-action[data-unavailable] { cursor: default; opacity: 0.4; }
+@media (hover: hover) {
+  .dsh-cn-action:hover { background: var(--dsw-alias-interactive-bg-hover); color: var(--dsw-alias-label-secondary); }
+  .dsh-cn-action[data-unavailable]:hover { background: transparent; color: var(--dsw-alias-label-tertiary); }
+}
 /* The turnTail slot's display: contents anchor puts its entries in the footer's flex column.
    Move the note past the action row and use visual order for the footer's focus groups. */
 @supports (reading-flow: flex-visual) {
@@ -17,13 +57,18 @@ export const styles = bundledChatStyles + `
     & > [data-slot="conversation.chat.turnTail"] > .dsh-cn-note { order: 1; }
   }
 }
-.dsh-cn-note { margin-block: 8px; }
+.dsh-cn-note {
+  display: flex; flex-direction: column; align-items: flex-end; gap: 6px; margin-block: 8px;
+}
 .dsh-cn-note[data-send-hidden] { display: none; }
 .dsh-cn-note .dsh-cn-title {
   display: flex; align-items: center; gap: 4px; color: var(--dsw-alias-label-secondary);
+  font-size: var(--dsh-content-font-size-secondary, 13px);
+  line-height: calc(18px + var(--dsh-content-font-delta-secondary, 0px));
 }
 /* Keep note actions visible independently of the enclosing reply and allow wrapping at narrow widths. */
 .dsh-cn-note .dsh-cn-actions {
+  display: flex; align-items: center; gap: 8px;
   flex-wrap: wrap; justify-content: flex-end; height: auto; max-width: 100%; opacity: 1;
 }
 .dsh-cn-media { display: grid; gap: 6px; justify-items: end; max-width: 100%; }
@@ -145,7 +190,7 @@ export function NoteAction({ label, unavailableReason, tooltipSide, onClick, chi
 }) {
   const unavailable = unavailableReason !== undefined
   return <Tooltip label={unavailableReason ?? label} side={tooltipSide} openOnClick={unavailable}>
-    <button type="button" className={action} aria-label={label} aria-disabled={unavailable || undefined}
+    <button type="button" className="dsh-cn-action" aria-label={label} aria-disabled={unavailable || undefined}
       aria-description={unavailableReason} data-unavailable={unavailable || undefined}
       onClick={unavailable ? undefined : onClick}>{children}</button>
   </Tooltip>
@@ -156,7 +201,7 @@ export function NoteTime({ savedAt, t }: { savedAt: number; t: ClockTranslate })
   const date = new Date(savedAt)
   const params = { y: date.getFullYear(), m: date.getMonth() + 1, d: date.getDate() }
   const full = `${t('clock.ymd', params)} ${formatMessageClock(savedAt, t, savedAt)}`
-  return <time className={timeStart} dateTime={date.toISOString()} title={full}>
+  return <time className="dsh-cn-time" dateTime={date.toISOString()} title={full}>
     {formatMessageClock(savedAt, t, day)}
   </time>
 }

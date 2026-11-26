@@ -4,9 +4,6 @@ import { createPortal } from 'react-dom'
 import {
   IconCheckOutlineRegular, IconCopyOutlineRegular, IconSendOutlineRegular, UserMessageBubble,
 } from '@deepseek-ai/dsh-client-ui-primitives'
-// @deepseek-ai/dsh-client-ui-chat 0.2.2-rc.5, src/client/chat. MIT, docs/dsh-ui-MIT.txt.
-import { referenceSummary, userRow, userStack } from '@deepseek-ai/dsh-client-ui-chat/src/client/chat/MessageItem.module.css'
-import { actions, visuallyHidden } from '@deepseek-ai/dsh-client-ui-chat/src/client/chat/MessageIconActions.module.css'
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type { SessionSnapshot } from '@deepseek-ai/dsh-api-session-controller/client'
@@ -154,7 +151,7 @@ export function apply(ctx: Context): void {
               save()
             }}><RestIcon size={24} /></button>}
           {saveFailed && <span role="alert" className="dsh-cn-save-error">{t('saveFailed')}</span>}
-          <span role="status" className={visuallyHidden}>{currentFeedback !== null && currentFeedback.failedDraft === undefined ? t('saved') : ''}</span>
+          <span role="status" className="dsh-cn-sr">{currentFeedback !== null && currentFeedback.failedDraft === undefined ? t('saved') : ''}</span>
         </>, card)}
       </>
     }
@@ -266,14 +263,14 @@ function NoteCard({ text, t, canSend, error, time, media, onRewind, onSend }: {
   // Keep tooltips clear of visible error feedback below the toolbar.
   const tooltipSide = hasError ? 'top' : 'bottom'
   return (
-    <section ref={card} className={`${userRow} dsh-cn-note`} data-dsh-session-caesura aria-label={t('title')}>
-      <div className={`${referenceSummary} dsh-cn-title`}><RestIcon size={15} />{t('title')}</div>
+    <section ref={card} className="dsh-cn-note" data-dsh-session-caesura aria-label={t('title')}>
+      <div className="dsh-cn-title"><RestIcon size={15} />{t('title')}</div>
       {/* Pass the literal draft so quote rendering cannot collapse saved paragraph breaks. */}
-      <div className={userStack}>
+      <div className="dsh-cn-stack">
         {media}
         {text.trim() !== '' && <UserMessageBubble>{text}</UserMessageBubble>}
       </div>
-      <div className={`${actions} dsh-cn-actions`} data-clock="start">
+      <div className="dsh-cn-actions" data-clock="start">
         {time}
         {text.trim() !== '' && <NoteAction label={t(status === 'copied' ? 'copied' : 'copy')} tooltipSide={tooltipSide} onClick={() => { void copy() }}>
           {status === 'copied' ? <IconCheckOutlineRegular /> : <IconCopyOutlineRegular />}
@@ -285,7 +282,7 @@ function NoteCard({ text, t, canSend, error, time, media, onRewind, onSend }: {
           <IconSendOutlineRegular />
         </NoteAction>
       </div>
-      <span className={hasError ? 'dsh-cn-status' : visuallyHidden} role="status">
+      <span className={hasError ? 'dsh-cn-status' : 'dsh-cn-sr'} role="status">
         {error !== null ? t(error) : status === 'ready' ? '' : t(status)}
       </span>
     </section>
