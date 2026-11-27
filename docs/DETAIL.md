@@ -1,3 +1,5 @@
+![Saved closing note card at turn end and persistent rest button in the composer (Chinese interface)](assets/screenshots/main-light.png)
+
 Hold `Mod` (`⌘` / `Ctrl`) and click `𝄽` or press `Mod+Enter` after a turn finishes
 to save a private closing note in this browser; once saved, click `𝄽` or press `Enter` to append.
 Use **Copy**, **Rewind**, or **Send** beside the timestamp on the note card.

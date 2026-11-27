@@ -14,4 +14,13 @@ Save a private closing note at the end of a conversation to record progress or t
 Requires DeepSeek Harness `0.2.2-rc.5`. Enable **Caesura · Closing note** in **Session Modular Improvement Plan**,
 or run `pnpm install` in this directory and select it in **Plugins → Add plugin**.
 
+## Screenshots
+
+A saved two-paragraph closing note at turn end with **Copy**, **Rewind**, and **Send** actions,
+and the persistent `𝄽` rest button in the composer (Chinese UI).
+
+| | Light | Dark |
+| --- | --- | --- |
+| Closing note & rest button | ![Saved closing note card at turn end and persistent rest button in the light theme](docs/assets/screenshots/main-light.png) | ![Saved closing note card at turn end and persistent rest button in the dark theme](docs/assets/screenshots/main-dark.png) |
+
 [Project documentation](docs/README.md)
