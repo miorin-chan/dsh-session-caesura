@@ -26,6 +26,8 @@
     "AGENTS.local.md",
     "DESIGN.md",
     "docs/README.md",
+    "docs/DETAIL.md",
+    "docs/DETAIL.zh.md",
     "README.zh.md",
     "lib/*.js",
     "docs/bravura-OFL.txt",
